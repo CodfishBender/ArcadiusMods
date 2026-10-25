@@ -19,6 +19,8 @@ namespace ArcadiusMiku
 
 			public float[] grip;
 
+			public List<ColliderFile> colliders;
+
 			public float[] vertices;
 
 			public float[] normals;
@@ -41,6 +43,17 @@ namespace ArcadiusMiku
 			public float[] head;
 
 			public float[] end;
+
+			public bool physics;
+		}
+
+		private sealed class ColliderFile
+		{
+			public string bone;
+
+			public float[] centre;
+
+			public float radius;
 		}
 
 		private sealed class MaterialFile
@@ -66,6 +79,20 @@ namespace ArcadiusMiku
 			public Vector3 Head;
 
 			public Vector3 End;
+
+			// Hair, moved by MikuBody's physics rather than by a chibi bone.
+			public bool Physics;
+		}
+
+		// A sphere that hair can't enter, moving with a bone.
+		public sealed class Collider
+		{
+			public int Bone;
+
+			// In the model's space at the bind pose, in metres.
+			public Vector3 Centre;
+
+			public float Radius;
 		}
 
 		private readonly List<(string texture, bool cutout)> _materialFiles = new List<(string, bool)>();
@@ -75,6 +102,8 @@ namespace ArcadiusMiku
 		private Material[] _materials;
 
 		public List<Bone> Bones { get; } = new List<Bone>();
+
+		public List<Collider> Colliders { get; } = new List<Collider>();
 
 		public Mesh Mesh { get; private set; }
 
@@ -104,7 +133,16 @@ namespace ArcadiusMiku
 						Parent = bone.parent == null ? -1 : resources.Bones.FindIndex(b => b.Name == bone.parent),
 						Head = ToVector(bone.head, 0) * scale,
 						End = ToVector(bone.end, 0) * scale,
+						Physics = bone.physics,
 					});
+				}
+				foreach (ColliderFile collider in model.colliders ?? new List<ColliderFile>())
+				{
+					int bone = resources.Bones.FindIndex(b => b.Name == collider.bone);
+					if (bone >= 0)
+					{
+						resources.Colliders.Add(new Collider { Bone = bone, Centre = ToVector(collider.centre, 0) * scale, Radius = collider.radius * scale });
+					}
 				}
 				resources.Grip = ToVector(model.grip, 0) * scale;
 				resources.Mesh = resources.BuildMesh(model, scale);

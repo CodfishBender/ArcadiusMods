@@ -8,9 +8,44 @@ namespace ArcadiusMiku
 {
 	// One chibi turned into Miku: a SkinnedMeshRenderer on Miku's own skeleton (same bone names as the chibi's,
 	// Miku's proportions). Each Miku bone copies the rotation its chibi bone has made since the bind pose (a T-pose,
-	// like Miku's), so the game's animations, emotes and held tools keep working.
+	// like Miku's), so the game's animations, emotes and held tools keep working. Hair bones swing with simple
+	// physics: each bone's tip has momentum and gravity, is slowed by the air (relative to the character, so running
+	// doesn't blow it back), springs back towards where the bone rests on its parent and stays out of the head,
+	// chest and hips.
 	internal sealed class MikuBody
 	{
+		// Hair physics settings from config.json, shared by every Miku.
+		public sealed class HairSettings
+		{
+			public bool Enabled = true;
+
+			// Share of the way back to the resting pose per 60th of a second (0 = limp, 1 = rigid).
+			public float Stiffness = 0.03f;
+
+			// Share of the speed (relative to the character) lost per 60th of a second.
+			public float Damping = 0.4f;
+
+			// Multiplies Earth gravity.
+			public float Gravity = 1f;
+		}
+
+		public static readonly HairSettings Hair = new HairSettings();
+
+		private static readonly Vector3 Gravity = new Vector3(0f, -9.81f, 0f);
+
+		// Moving further than this in a frame (respawn, teleport) resets the hair to its resting pose.
+		private const float TeleportDistance = 2f;
+
+		// Hair physics runs at 90 steps a second, at most 8 per frame (longer frames are slowed down).
+		private const float HairStep = 1f / 90f;
+
+		private const int MaxHairSteps = 8;
+
+		private const float MaxHairTime = MaxHairSteps * HairStep;
+
+		// How far a hair bone can bend away from its resting direction on its parent, in degrees.
+		private const float MaxHairAngle = 60f;
+
 		private sealed class Bone
 		{
 			public Transform Transform;
@@ -24,6 +59,21 @@ namespace ArcadiusMiku
 			public Quaternion Align = Quaternion.identity;
 
 			public int Parent;
+
+			// Hair: the bone's offset from head to tip (in its parent's axes, at rest), the simulated tip (world
+			// space) and the colliders its resting tip is outside of.
+			public bool Physics;
+
+			public Vector3 Rest;
+
+			public Vector3 Tip;
+
+			public Vector3 PreviousTip;
+
+			// Where the bone's head was at the last step; the head moves evenly across a frame's steps.
+			public Vector3 PreviousHead;
+
+			public List<int> Colliders;
 		}
 
 		// Limbs whose direction differs a little between Miku and the chibi.
@@ -32,6 +82,21 @@ namespace ArcadiusMiku
 		private readonly List<Bone> _bones = new List<Bone>();
 
 		private readonly List<Renderer> _hidden = new List<Renderer>();
+
+		private readonly List<(Transform bone, Vector3 centre, float radius)> _colliders = new List<(Transform, Vector3, float)>();
+
+		private bool _hairReady;
+
+		private int _hairFrame;
+
+		// Time not yet simulated, less than one step.
+		private float _hairTime;
+
+		// The character's position last frame. Its movement is carried by the hair every frame (moving the tips
+		// without changing their speed), so running doesn't blow the hair back or make it stutter between steps.
+		// Only the character's movement is carried: carrying each bone's head too passes every swing down the
+		// chain and whips the tips.
+		private Vector3 _hairRoot;
 
 		private Quaternion[] _deltas;
 
@@ -119,9 +184,27 @@ namespace ArcadiusMiku
 						part.Align = Quaternion.FromToRotation(bone.End - bone.Head, chibi.bind.GetColumn(1));
 					}
 				}
+				if (bone.Physics)
+				{
+					part.Physics = true;
+					part.Rest = bone.End - bone.Head;
+					part.Colliders = new List<int>();
+					for (int c = 0; c < resources.Colliders.Count; c++)
+					{
+						MikuResources.Collider collider = resources.Colliders[c];
+						if ((bone.End - collider.Centre).sqrMagnitude > collider.Radius * collider.Radius)
+						{
+							part.Colliders.Add(c);
+						}
+					}
+				}
 				body._bones.Add(part);
 			}
 			body._deltas = new Quaternion[body._bones.Count];
+			foreach (MikuResources.Collider collider in resources.Colliders)
+			{
+				body._colliders.Add((transforms[collider.Bone], collider.Centre - resources.Bones[collider.Bone].Head, collider.Radius));
+			}
 
 			SkinnedMeshRenderer renderer = new GameObject("Miku mesh") { layer = layer }.AddComponent<SkinnedMeshRenderer>();
 			renderer.transform.SetParent(body._root.transform, false);
@@ -194,6 +277,10 @@ namespace ArcadiusMiku
 			float foot = Mathf.Min(_model.InverseTransformPoint(_feet[0].position).y, _model.InverseTransformPoint(_feet[1].position).y);
 			float chibiFoot = Mathf.Min(_model.InverseTransformPoint(_chibiFeet[0].position).y, _model.InverseTransformPoint(_chibiFeet[1].position).y);
 			_hips.localPosition += Vector3.up * (_footBind + (chibiFoot - _chibiFootBind) - foot);
+			if (Hair.Enabled)
+			{
+				SimulateHair();
+			}
 
 			if (_equip != null)
 			{
@@ -202,6 +289,104 @@ namespace ArcadiusMiku
 				_equip.localRotation = _equipRotation;
 				_equip.position = _rightHand.TransformPoint(_grip);
 			}
+		}
+
+		// Verlet integration of each hair bone's tip, parents first so each bone hangs from its parent's new pose.
+		// Steps at a fixed rate whatever the frame rate (uneven frame times would otherwise add energy); each frame
+		// shows the tips part way between the last two steps.
+		private void SimulateHair()
+		{
+			int steps = 0;
+			if (Time.frameCount != _hairFrame)
+			{
+				_hairFrame = Time.frameCount;
+				_hairTime += Mathf.Min(Time.deltaTime, MaxHairTime);
+				steps = Mathf.FloorToInt(_hairTime / HairStep);
+				_hairTime -= steps * HairStep;
+				steps = Mathf.Min(steps, MaxHairSteps);
+			}
+			Vector3 root = _root.transform.position;
+			bool reset = !_hairReady || (root - _hairRoot).sqrMagnitude > TeleportDistance * TeleportDistance;
+			Vector3 moved = root - _hairRoot;
+			_hairRoot = root;
+			_hairReady = true;
+			// Shown between the last two steps, by how far time is towards the next one.
+			float between = _hairTime / HairStep;
+			float scale = _root.transform.lossyScale.y;
+			Vector3 gravity = Gravity * (Hair.Gravity * HairStep * HairStep);
+			float pull = 1f - Mathf.Pow(1f - Mathf.Clamp01(Hair.Stiffness), HairStep * 60f);
+			float keep = Mathf.Pow(1f - Mathf.Clamp01(Hair.Damping), HairStep * 60f);
+			foreach (Bone bone in _bones)
+			{
+				if (!bone.Physics)
+				{
+					continue;
+				}
+				Transform transform = bone.Transform;
+				Vector3 head = transform.position;
+				Vector3 rest = transform.parent.TransformVector(bone.Rest);
+				float length = rest.magnitude;
+				if (length < 1e-5f)
+				{
+					continue;
+				}
+				if (reset)
+				{
+					bone.Tip = bone.PreviousTip = head + rest;
+					bone.PreviousHead = head;
+				}
+				else
+				{
+					bone.Tip += moved;
+					bone.PreviousTip += moved;
+					bone.PreviousHead += moved;
+				}
+				for (int k = 0; k < steps && !reset; k++)
+				{
+					Vector3 to = Vector3.Lerp(bone.PreviousHead, head, (float)(k + 1) / steps);
+					Vector3 velocity = (bone.Tip - bone.PreviousTip) * keep;
+					bone.PreviousTip = bone.Tip;
+					bone.Tip += velocity + gravity;
+					bone.Tip += (to + rest - bone.Tip) * pull;
+					foreach (int c in bone.Colliders)
+					{
+						(Transform colliderBone, Vector3 centre, float radius) = _colliders[c];
+						Vector3 position = colliderBone.TransformPoint(centre);
+						Vector3 away = bone.Tip - position;
+						float r = radius * scale;
+						if (away.sqrMagnitude < r * r)
+						{
+							bone.Tip = position + (away.sqrMagnitude > 1e-8f ? away.normalized : rest / length) * r;
+						}
+					}
+					bone.Tip = to + Limit(bone.Tip - to, rest);
+				}
+				if (steps > 0)
+				{
+					bone.PreviousHead = head;
+				}
+				// Aim at the tip without moving it (moving it would count as speed at the next step).
+				Vector3 shown = Vector3.Lerp(bone.PreviousTip, bone.Tip, between);
+				transform.rotation = Quaternion.FromToRotation(rest, Limit(shown - head, rest)) * transform.parent.rotation;
+			}
+		}
+
+		// The bone's length along line, at most MaxHairAngle from its resting direction (so hair can't swing
+		// round its parent).
+		private static Vector3 Limit(Vector3 line, Vector3 rest)
+		{
+			float length = rest.magnitude;
+			if (line.sqrMagnitude < 1e-10f)
+			{
+				return rest;
+			}
+			float angle = Vector3.Angle(rest, line);
+			if (angle > MaxHairAngle)
+			{
+				Vector3 axis = Vector3.Cross(rest, line);
+				line = axis.sqrMagnitude > 1e-10f ? Quaternion.AngleAxis(MaxHairAngle, axis) * rest : rest;
+			}
+			return line.normalized * length;
 		}
 
 		// Brings the chibi back.

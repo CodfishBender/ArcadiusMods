@@ -164,6 +164,35 @@ namespace ArcadiusOffline
 			}
 		}
 
+		// Runs as the game starts to quit, while everything still exists. The unmodded game never hosts in-process;
+		// left running, FishNet's sockets (and LiteNetLib's threads) are only stopped in OnDestroy while Unity tears
+		// the game down, and the game sometimes crashed on exit there.
+		public static void StopNetworking()
+		{
+			NetworkManager networkManager = InstanceFinder.NetworkManager;
+			if (networkManager == null)
+			{
+				return;
+			}
+			try
+			{
+				if (networkManager.ClientManager != null && networkManager.ClientManager.Started)
+				{
+					networkManager.ClientManager.StopConnection();
+				}
+				if (networkManager.ServerManager != null && networkManager.ServerManager.Started)
+				{
+					networkManager.ServerManager.StopConnection(true);
+				}
+				networkManager.TransportManager?.Transport?.Shutdown();
+				Debug.Log("[Offline] Stopped networking before quitting.");
+			}
+			catch (Exception ex)
+			{
+				Debug.LogWarning("[Offline] Stopping networking before quitting failed: " + ex.Message);
+			}
+		}
+
 		// Runs at the start of Menu_Connecting.OnEnable. Offline sign-in completes instantly, so
 		// UserInterfaceBehaviour.Start can switch back to the Connecting menu after it already
 		// moved on to server select; that menu never restarts sign-in and stays on "Account ready.".

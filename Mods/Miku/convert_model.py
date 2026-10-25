@@ -4,11 +4,13 @@
 # Usage: blender -b --python convert_model.py -- <model.fbx> <model.pmx> <out dir>
 #
 # Weights are folded onto the game's chibi bones: each MMD bone counts for its nearest ancestor in BONES
-# (hair, eyes and accessories -> head, skirt -> hips, twist bones -> arm, fingers -> hand, toes -> foot).
+# (eyes and accessories -> head, skirt -> hips, twist bones -> arm, fingers -> hand, toes -> foot). Hair bones
+# (EX_..._hair_NN) are kept for MikuBody's hair physics, with collision spheres for the head, chest and hips.
 # Output is in Unity's axes (Y up, +Z forward, the character's left at -X) in the model's own units, with the
 # feet at y = 0 and the triangle winding reversed for the mirrored axes.
 import json
 import os
+import re
 import shutil
 import struct
 import sys
@@ -36,6 +38,11 @@ for side in ("L", "R"):
     ]
 # Bones that point at another bone's head rather than their own tail (MikuBody aims limbs along this line).
 ENDS = {"upper.Arm.": "ひじ.", "forearm.": "手首.", "thigh.": "ひざ.", "shin.": "足首."}
+HAIR = re.compile(r"^EX_.*_hair_\d+$")
+# Bones that hair collides with; each sphere fits the vertices that bone moves most (not the hair itself).
+COLLIDERS = ["head", "upper.chest", "chest", "hips"]
+# Added to each collider's radius, for the thickness of the hair (model units).
+HAIR_MARGIN = 0.25
 
 
 def to_unity(v):
@@ -165,6 +172,19 @@ def main():
     if missing:
         raise SystemExit("Missing MMD bones: " + ", ".join(missing))
 
+    # Hair bones, parents first, each under its nearest kept ancestor.
+    chibi_by_mmd = {mmd: name for name, mmd, _ in BONES}
+    depth = lambda b: 0 if b.parent is None else 1 + depth(b.parent)
+    for b in sorted((b for b in bones if HAIR.match(b.name)), key=depth):
+        parent = b.parent
+        while parent is not None and parent.name not in chibi_by_mmd:
+            parent = parent.parent
+        if parent is None:
+            continue
+        BONES.append((b.name, b.name, chibi_by_mmd[parent.name]))
+        chibi_by_mmd[b.name] = b.name
+    physics = {name for name, mmd, _ in BONES if HAIR.match(mmd)}
+
     index = {name: i for i, (name, _, _) in enumerate(BONES)}
     by_mmd = {mmd: index[name] for name, mmd, _ in BONES}
 
@@ -239,15 +259,27 @@ def main():
     for name, mmd, parent in BONES:
         stem = next((k for k in ENDS if name.startswith(k)), None)
         end = head(ENDS[stem] + name.rsplit(".", 1)[1]) if stem else point(bones[mmd].tail_local)
-        bone_list.append({"name": name, "parent": parent, "head": head(mmd), "end": end})
+        bone_list.append({"name": name, "parent": parent, "head": head(mmd), "end": end, "physics": name in physics})
     # Where held tools go: between the right wrist and the middle finger's knuckle.
     wrist, knuckle = head("手首.R"), head("中指１.R")
     grip = tuple(w + (k - w) * 0.6 for w, k in zip(wrist, knuckle))
+
+    colliders = []
+    for name in COLLIDERS:
+        b = index[name]
+        points = [point(v.co) for v, w in zip(mesh.vertices, weights) if w[0][0] == b and not any(BONES[i][0] in physics for i, x in w if x > 0)]
+        if not points:
+            continue
+        centre = tuple(sum(p[k] for p in points) / len(points) for k in range(3))
+        flat_distances = sorted(((p[0] - centre[0]) ** 2 + (p[2] - centre[2]) ** 2) ** 0.5 for p in points)
+        radius = flat_distances[int(len(flat_distances) * 0.7)] + HAIR_MARGIN
+        colliders.append({"bone": name, "centre": [round(c, 4) for c in centre], "radius": round(radius, 4)})
 
     flat = lambda rows, digits: [round(c, digits) for row in rows for c in row]
     model = {
         "bones": [{**b, "head": [round(c, 4) for c in b["head"]], "end": [round(c, 4) for c in b["end"]]} for b in bone_list],
         "grip": [round(c, 4) for c in grip],
+        "colliders": colliders,
         "vertices": flat(vertices, 4),
         "normals": flat(norms, 3),
         "uv": flat(uvs, 5),
@@ -263,7 +295,9 @@ def main():
     height = max(v[1] for v in vertices)
     print("Wrote %d vertices, %d triangles, %d materials, height %.3f units" % (len(vertices), sum(len(m["triangles"]) for m in materials) // 3, len(materials), height))
     for b in bone_list:
-        print("  %-12s head %s" % (b["name"], tuple(round(c, 2) for c in b["head"])))
+        print("  %-20s head %-24s parent %s%s" % (b["name"], tuple(round(c, 2) for c in b["head"]), b["parent"], "  (physics)" if b["physics"] else ""))
+    for c in colliders:
+        print("  collider %-12s centre %s radius %.2f" % (c["bone"], tuple(round(x, 2) for x in c["centre"]), c["radius"]))
     for m in materials:
         print("  material %-8s %-24s cutout=%s triangles=%d" % (m["name"], m["texture"], m["cutout"], len(m["triangles"]) // 3))
     used = {}

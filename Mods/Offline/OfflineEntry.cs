@@ -69,6 +69,9 @@ namespace ArcadiusOffline
 			// Server select: start an in-process server right before connecting.
 			Prefix(harmony, typeof(Menu_ServerSelect), nameof(Menu_ServerSelect.ConnectSelectedServer), nameof(Patches.BeforeConnect));
 
+			// Quitting: stop the in-process server and client before Unity tears the game down.
+			Application.quitting += OfflineMode.StopNetworking;
+
 			// Connecting menu: continue to server select if it is re-shown after sign-in already finished.
 			Prefix(harmony, typeof(Menu_Connecting), "OnEnable", nameof(Patches.ConnectingMenuEnabled));
 		}

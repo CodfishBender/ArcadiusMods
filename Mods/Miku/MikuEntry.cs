@@ -46,6 +46,10 @@ namespace ArcadiusMiku
 
 		private void ReadSettings()
 		{
+			MikuBody.Hair.Enabled = _context.Config.Get("hairPhysics", true);
+			MikuBody.Hair.Stiffness = Mathf.Clamp01(_context.Config.Get("hairStiffness", 0.03f));
+			MikuBody.Hair.Damping = Mathf.Clamp01(_context.Config.Get("hairDamping", 0.4f));
+			MikuBody.Hair.Gravity = Mathf.Max(0f, _context.Config.Get("hairGravity", 1f));
 			_applyTo = _context.Config.Get("applyTo", "outfit").Trim().ToLowerInvariant();
 			if (_applyTo != "outfit" && _applyTo != "self" && _applyTo != "players" && _applyTo != "all")
 			{
