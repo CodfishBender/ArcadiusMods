@@ -1,0 +1,9 @@
+{
+  "id": "perfecthits",
+  "name": "Perfect Hits",
+  "version": "1.0.0",
+  "description": "Mining and woodcutting swings at or above perfectHitPercent (config.json, default 95) count as a 100% hit, which deals double damage. Needs the offline mod, so it never applies online.",
+  "dll": "PerfectHits.dll",
+  "enabled": true,
+  "dependsOn": ["offline"]
+}

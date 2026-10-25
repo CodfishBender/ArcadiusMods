@@ -1,0 +1,8 @@
+{
+  "id": "miku",
+  "name": "Hatsune Miku",
+  "version": "1.0.0",
+  "description": "Hatsune Miku as a wardrobe outfit, animated by the game's own animations. Settings: applyTo (outfit, or self, players or all to force it on), height in metres. The model isn't included; see the README.",
+  "dll": "Miku.dll",
+  "enabled": true
+}

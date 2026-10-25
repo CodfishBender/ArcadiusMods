@@ -1,0 +1,11 @@
+{
+  "id": "privateserver",
+  "name": "Private Server",
+  "version": "1.0.0",
+  "description": "Host your world for friends, or join theirs by address, from the server list. Settings: hostPort, maxPlayers, bindAddress, servers (saved addresses). Needs the offline mod on every player's game.",
+  "dll": "PrivateServer.dll",
+  "enabled": true,
+  "dependsOn": [
+    "offline"
+  ]
+}

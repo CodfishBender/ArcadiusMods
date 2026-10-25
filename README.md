@@ -91,6 +91,9 @@ public sealed class MyMod : IMod
 - `GameHooks.AddSellValueModifier` (ore, ingot, fish, wood and crop sell values, including tooltips) and
   `GameHooks.AddXpModifier` (per skill), both after research bonuses.
 - `ModEvents.Update`, `ModEvents.SceneLoaded`, `ModEvents.ConfigReloaded`.
+- `Outfits.Register(id, name, icon)` adds a whole-character outfit to the top of the wardrobe; one outfit is
+  worn at a time, kept on this PC, and synced to other players with the loader through the game's cosmetic
+  sync. `Outfits.WornBy(chibiVisual)` says which outfit a player wears (see `Mods/Steve`, `Mods/Miku`).
 - Decompiled game code (for finding methods to patch): `~/.cache/rea-work/arcadius/src/acs`.
 - Assembly-CSharp has a global `JsonConvert` (a JsonUtility wrapper): write `Newtonsoft.Json.JsonConvert`.
 - Use Newtonsoft rather than JsonUtility for your own data: mod DLLs load outside Unity's serializer.
@@ -189,9 +192,13 @@ so far is dumped, so visit more screens and dump again.
 
 | Mod | Default | What it does |
 |---|---|---|
-| `Offline` | on | Play without Unity Gaming Services. Settings: `upkeepRequirementPercent` (10), `townBonuses` (true). |
+| `Offline` | on | Play without Unity Gaming Services. Chat has no mining level 5 requirement and goes through the game server (local or private) instead of Vivox. Settings: `upkeepRequirementPercent` (10), `townBonuses` (true). |
 | `Tweaks` | on | Example: `sellValuePercent` and `xpPercent` (100 = unchanged). Needs `offline`. |
-| `Steve` | on | Replaces your character with Minecraft Steve, driven by the game's animations. Settings: `applyTo` (`self`, `players` or `all`), `height` (1.7 m), `skin` (any 64x64 skin PNG, default `Model/steve.png`). The model and skin aren't included; see [Steve model and skin](#steve-model-and-skin). |
+| `PerfectHits` | on | Mining and woodcutting swings at or above `perfectHitPercent` (95) count as a 100% double-damage hit. Needs `offline`. |
+| `TreeLogs` | on | Felled trees always drop `logsPerTree` logs (3) instead of 1 to 3. Needs `offline`. |
+| `PrivateServer` | on | Brings back private servers: the server list gets **Host private server** (your world, open to others on UDP `hostPort`, default 7770, up to `maxPlayers`, 8), your saved `servers` (`[{"name": "Sam", "address": "1.2.3.4", "port": 7770}]`), and **Join by address...** (type `host:port`; remembered as `lastAddress`). `bindAddress` (empty = all) limits which network the host listens on. Every player needs `offline`. Friends outside your network need the port forwarded (UDP) or a VPN such as Tailscale. |
+| `Steve` | on | Minecraft Steve as an outfit, driven by the game's animations: click **Steve** in the wardrobe to put it on or take it off. Other players with this mod see it too. Settings: `applyTo` (`outfit`, or `self`, `players` or `all` to force it on), `height` (1.7 m), `skin` (any 64x64 skin PNG, default `Model/steve.png`). The model and skin aren't included; see [Steve model and skin](#steve-model-and-skin). |
+| `Miku` | on | Hatsune Miku as an outfit, the same way (a skinned model on its own skeleton, following the chibi's). Settings: `applyTo` (as Steve), `height` (1.6 m). The model isn't included; see [Miku model](#miku-model). |
 | `CloudCodeCapture` | off | Developer tool: plays online and logs Cloud Code traffic to `cloudcode_capture.jsonl`. Disable `offline` to use it. |
 
 Gameplay tweaks are only meant for offline play; online, the server is authoritative.
@@ -207,3 +214,16 @@ Before `./install.sh`, add them to `Mods/Steve` (both folders are git-ignored):
    `blender -b --python convert_model.py -- minecraft-steve/source/steve.fbx Model/steve.json`.
    The script checks for six boxes and prints each part's bounds.
 3. A 64x64 Minecraft skin (yours, or Steve's from the game) at `Model/steve.png`.
+
+### Miku model
+
+The Miku model is a third-party fan model, so this repo doesn't include it. `Mods/Miku/convert_model.py`
+converts any rigged MMD model with the standard bones (センター, 上半身, 首, 頭, 肩, 腕, ひじ, 手首, 足, ひざ, 足首),
+given as an FBX exported by mmd_tools plus its PMX (for the material textures). Before `./install.sh`, in
+`Mods/Miku` (both folders are git-ignored):
+
+1. Put the FBX, PMX and textures in `hatsune-miku/`.
+2. Convert it:
+   `blender -b --python convert_model.py -- "hatsune-miku/PS - Hatsune Miku.fbx" "hatsune-miku/PS - Hatsune Miku.pmx" Model`.
+   This writes `Model/miku.json`, copies the textures and renders `Model/icon.png` for the wardrobe. It
+   prints each bone's joint, the materials and how much weight each bone carries.

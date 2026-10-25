@@ -1,0 +1,9 @@
+{
+  "id": "treelogs",
+  "name": "Tree Logs",
+  "version": "1.0.0",
+  "description": "Felled trees always drop the same number of logs (logsPerTree in config.json, default 3) instead of 1 to 3. Needs the offline mod, so it never applies online.",
+  "dll": "TreeLogs.dll",
+  "enabled": true,
+  "dependsOn": ["offline"]
+}

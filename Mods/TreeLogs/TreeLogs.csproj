@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>TreeLogs</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../ModLoader/ArcadiusModLoader.csproj"><Private>false</Private></ProjectReference>
+  </ItemGroup>
+</Project>

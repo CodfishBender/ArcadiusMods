@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Miku</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="UnityEngine.AnimationModule"><HintPath>$(GameManaged)/UnityEngine.AnimationModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.ImageConversionModule"><HintPath>$(GameManaged)/UnityEngine.ImageConversionModule.dll</HintPath><Private>false</Private></Reference>
+    <ProjectReference Include="../../ModLoader/ArcadiusModLoader.csproj"><Private>false</Private></ProjectReference>
+  </ItemGroup>
+</Project>

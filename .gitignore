@@ -8,3 +8,6 @@ legacy/OfflineMod/*.patched.dll
 # Third-party Steve model and skin: not redistributed, see README (Steve mod)
 Mods/Steve/minecraft-steve/
 Mods/Steve/Model/
+# Third-party Miku model: not redistributed, see README (Miku model)
+Mods/Miku/hatsune-miku/
+Mods/Miku/Model/

@@ -56,6 +56,10 @@ namespace ArcadiusOffline
 			// (The "change once" hint is reworded by Text/strings.json.)
 			Prefix(harmony, typeof(DisplayNameService), "SyncUgsPlayerNameAsync", nameof(Patches.CompletedTask));
 
+			// Chat: no mining level 5 requirement, and messages go through the game server instead of Vivox.
+			Prefix(harmony, typeof(ChatManager), nameof(ChatManager.IsMiningLevelUnlockedForChat), nameof(Patches.ChatUnlocked));
+			OfflineChat.Install(harmony);
+
 			// Steam -> UGS cosmetic migration needs UGS; skip it.
 			Prefix(harmony, typeof(SteamLegacyCosmeticService), nameof(SteamLegacyCosmeticService.LinkSteamAndLogArcadiusCosmeticsAsync), nameof(Patches.CompletedTask));
 
@@ -117,6 +121,13 @@ namespace ArcadiusOffline
 				return false;
 			}
 
+			// Same as the original without the level check: unlocked once player data has loaded.
+			public static bool ChatUnlocked(ref bool __result)
+			{
+				__result = Playfab_PlayerData.isIntilized;
+				return false;
+			}
+
 			public static bool LeaderboardsUnavailable(ref Task<List<UnityLeaderboardEntry>> __result)
 			{
 				__result = OfflineMode.Unavailable<List<UnityLeaderboardEntry>>("Leaderboards");
@@ -135,9 +146,9 @@ namespace ArcadiusOffline
 				return false;
 			}
 
-			public static void BeforeConnect()
+			public static void BeforeConnect(Menu_ServerSelect __instance)
 			{
-				OfflineMode.EnsureLocalServer();
+				OfflineMode.EnsureLocalServer(Traverse.Create(__instance).Method("GetSelectedServer").GetValue<GameServiceServerInfo>());
 			}
 
 			public static void ConnectingMenuEnabled(MonoBehaviour __instance)

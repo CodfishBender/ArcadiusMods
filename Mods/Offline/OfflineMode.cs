@@ -21,6 +21,8 @@ namespace ArcadiusOffline
 
 		private const string ClientVersion = "1.0.5";
 
+		private const string LocalServerId = "local";
+
 		private static string _playerId;
 
 		public static string PlayerId
@@ -141,11 +143,12 @@ namespace ArcadiusOffline
 		}
 
 		// Runs before the server-select menu connects: start a FishNet server in this
-		// process so the client connects to itself (host mode).
-		public static void EnsureLocalServer()
+		// process so the client connects to itself (host mode). Only for this mod's own entry:
+		// other entries (e.g. the private server mod's) start their own server or join someone else's.
+		public static void EnsureLocalServer(GameServiceServerInfo server)
 		{
 			NetworkManager networkManager = InstanceFinder.NetworkManager;
-			if (networkManager == null || networkManager.ServerManager == null)
+			if (networkManager == null || networkManager.ServerManager == null || (server != null && server.id != LocalServerId))
 			{
 				return;
 			}
@@ -200,7 +203,7 @@ namespace ArcadiusOffline
 				{
 					new GameServiceServerInfo
 					{
-						id = "local",
+						id = LocalServerId,
 						name = "Offline (Local)",
 						ip = "127.0.0.1",
 						port = 0,
