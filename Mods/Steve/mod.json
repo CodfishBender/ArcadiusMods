@@ -1,0 +1,8 @@
+{
+  "id": "steve",
+  "name": "Steve",
+  "version": "1.0.0",
+  "description": "Replaces the player character with the Minecraft Steve model, animated by the game's own animations. Settings: applyTo (self, players or all), height in metres, skin (a 64x64 Minecraft skin PNG).",
+  "dll": "Steve.dll",
+  "enabled": true
+}

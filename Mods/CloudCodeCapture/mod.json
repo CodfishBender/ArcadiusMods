@@ -1,0 +1,9 @@
+{
+  "id": "cloudcode-capture",
+  "name": "Cloud Code Capture",
+  "version": "1.0.0",
+  "description": "Developer tool: plays online and logs every Cloud Code request and response to cloudcode_capture.jsonl in the game's data folder. Disable the offline mod to use it.",
+  "dll": "CloudCodeCapture.dll",
+  "enabled": false,
+  "conflictsWith": ["offline"]
+}

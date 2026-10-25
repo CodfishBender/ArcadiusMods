@@ -1,0 +1,10 @@
+bin/
+obj/
+# Local path to the game, written by install.sh --game
+game.path
+# Registry save backups from the old offline mod: personal data
+legacy/OfflineMod/saves/
+legacy/OfflineMod/*.patched.dll
+# Third-party Steve model and skin: not redistributed, see README (Steve mod)
+Mods/Steve/minecraft-steve/
+Mods/Steve/Model/

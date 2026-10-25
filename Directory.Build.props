@@ -1,0 +1,20 @@
+<Project>
+  <!-- Shared by the mod loader and every mod: target the game's Mono runtime and reference its assemblies. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- install.sh passes GameManaged; IDE builds use $ARCADIUS_GAME, else the game next to this repo. -->
+    <GameManaged Condition="'$(GameManaged)' == '' and '$(ARCADIUS_GAME)' != ''">$(ARCADIUS_GAME)/Arcadius_Data/Managed</GameManaged>
+    <GameManaged Condition="'$(GameManaged)' == ''">$(MSBuildThisFileDirectory)../Arcadius/Arcadius_Data/Managed</GameManaged>
+    <ModKitLib>$(MSBuildThisFileDirectory)lib</ModKitLib>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="0Harmony"><HintPath>$(ModKitLib)/0Harmony.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Assembly-CSharp"><HintPath>$(GameManaged)/Assembly-CSharp.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(GameManaged)/UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Newtonsoft.Json"><HintPath>$(GameManaged)/Newtonsoft.Json.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+</Project>

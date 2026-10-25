@@ -1,0 +1,9 @@
+{
+  "id": "tweaks",
+  "name": "Tweaks",
+  "version": "1.0.0",
+  "description": "Example gameplay tweaks driven by config.json: sell value and XP multipliers (100 = unchanged). Needs the offline mod, so tweaks never apply online.",
+  "dll": "Tweaks.dll",
+  "enabled": true,
+  "dependsOn": ["offline"]
+}
