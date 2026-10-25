@@ -199,6 +199,7 @@ so far is dumped, so visit more screens and dump again.
 | `PrivateServer` | on | Brings back private servers: the server list gets **Host private server** (your world, open to others on UDP `hostPort`, default 7770, up to `maxPlayers`, 8), your saved `servers` (`[{"name": "Sam", "address": "1.2.3.4", "port": 7770}]`), and **Join by address...** (type `host:port`; remembered as `lastAddress`). `bindAddress` (empty = all) limits which network the host listens on. Every player needs `offline`. Friends outside your network need the port forwarded (UDP) or a VPN such as Tailscale. |
 | `Steve` | on | Minecraft Steve as an outfit, driven by the game's animations: click **Steve** in the wardrobe to put it on or take it off. Other players with this mod see it too. Settings: `applyTo` (`outfit`, or `self`, `players` or `all` to force it on), `height` (1.7 m), `skin` (any 64x64 skin PNG, default `Model/steve.png`). The model and skin aren't included; see [Steve model and skin](#steve-model-and-skin). |
 | `Miku` | on | Hatsune Miku as an outfit, the same way (a skinned model on its own skeleton, following the chibi's). Its hair (twin tails, fringe and side locks) swings with simple physics and stays out of the head, chest and hips. Settings: `applyTo` (as Steve), `height` (1.6 m), `hairPhysics` (true), `hairStiffness` (0.03, 0 = limp, 1 = rigid), `hairDamping` (0.4, air resistance), `hairGravity` (1). The model isn't included; see [Miku model](#miku-model). |
+| `Supra` | on | A gag outfit: you become a Toyota Supra (flat colours, rolling wheels, the body tilts when speeding up, braking and turning; held tools are hidden). Settings: `applyTo` (as Steve), `length` (3 m). The model isn't included; see [Supra model](#supra-model). |
 | `CloudCodeCapture` | off | Developer tool: plays online and logs Cloud Code traffic to `cloudcode_capture.jsonl`. Disable `offline` to use it. |
 
 Gameplay tweaks are only meant for offline play; online, the server is authoritative.
@@ -227,3 +228,13 @@ given as an FBX exported by mmd_tools plus its PMX (for the material textures). 
    `blender -b --python convert_model.py -- "hatsune-miku/PS - Hatsune Miku.fbx" "hatsune-miku/PS - Hatsune Miku.pmx" Model`.
    This writes `Model/miku.json`, copies the textures and renders `Model/icon.png` for the wardrobe. It
    prints each bone's joint, the materials and how much weight each bone carries.
+
+### Supra model
+
+The Toyota Supra is a free third-party Blender model, so this repo doesn't include it. Before `./install.sh`,
+in `Mods/Supra` (both folders are git-ignored):
+
+1. Put the `.blend` in `toyota-supra/`.
+2. Convert it: `blender -b "toyota-supra/supra free.blend" --python convert_model.py -- Model`.
+   This drops hidden parts (brakes, suspension, engine bay), simplifies the wheels, gives each material a flat
+   colour (`COLOURS` in the script; the paint is orange) and renders `Model/icon.png`.

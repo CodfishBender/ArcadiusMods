@@ -1,0 +1,8 @@
+{
+  "id": "supra",
+  "name": "Toyota Supra",
+  "version": "1.0.0",
+  "description": "A gag outfit: you become a Toyota Supra, with rolling wheels and a body that tilts as you drive. Settings: applyTo (outfit, or self, players or all to force it on), length in metres. The model isn't included; see the README.",
+  "dll": "Supra.dll",
+  "enabled": true
+}
