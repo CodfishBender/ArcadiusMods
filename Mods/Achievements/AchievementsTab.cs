@@ -240,8 +240,9 @@ namespace ArcadiusAchievements
 				rect.sizeDelta = new Vector2(339f, 504f);
 			}
 			_summary.alignment = TextAlignmentOptions.Top;
-			// Clear of the page border at the top.
-			_summary.margin = new Vector4(0f, 30f, 0f, 0f);
+			// Clear of the page border at the top, and further from the right edge (the filters move with it).
+			_summary.margin = new Vector4(0f, 10f, 0f, 0f);
+			_summary.rectTransform.anchoredPosition -= new Vector2(40f, 0f);
 			_summary.richText = true;
 			_summary.textWrappingMode = TextWrappingModes.Normal;
 
@@ -289,7 +290,7 @@ namespace ArcadiusAchievements
 			rect.anchorMax = Vector2.one;
 			// Below the two lines of the unlocked count.
 			rect.offsetMin = new Vector2(10f, 0f);
-			rect.offsetMax = new Vector2(-10f, -100f);
+			rect.offsetMax = new Vector2(-10f, -80f);
 			VerticalLayoutGroup layout = filters.GetComponent<VerticalLayoutGroup>();
 			layout.childControlWidth = true;
 			layout.childControlHeight = true;
