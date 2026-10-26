@@ -200,6 +200,7 @@ so far is dumped, so visit more screens and dump again.
 | `Steve` | on | Minecraft Steve as an outfit, driven by the game's animations: click **Steve** in the wardrobe to put it on or take it off. Other players with this mod see it too. Settings: `applyTo` (`outfit`, or `self`, `players` or `all` to force it on), `height` (1.7 m), `skin` (any 64x64 skin PNG, default `Model/steve.png`). The model and skin aren't included; see [Steve model and skin](#steve-model-and-skin). |
 | `Miku` | on | Hatsune Miku as an outfit, the same way (a skinned model on its own skeleton, following the chibi's). Its hair (twin tails, fringe and side locks) swings with simple physics and stays out of the head, chest and hips. Settings: `applyTo` (as Steve), `height` (1.6 m), `hairPhysics` (true), `hairStiffness` (0.03, 0 = limp, 1 = rigid), `hairDamping` (0.4, air resistance), `hairGravity` (1). The model isn't included; see [Miku model](#miku-model). |
 | `Supra` | on | A gag outfit: you become a Toyota Supra (flat colours, rolling wheels, the body tilts when speeding up, braking and turning; held tools are hidden). Settings: `applyTo` (as Steve), `length` (3 m). The model isn't included; see [Supra model](#supra-model). |
+| `Achievements` | on | The game's 96 Steam achievements (same names, descriptions and hidden ones), in a new **Achievements** tab of the player book (Tab key) with each one's progress, and a pop-up when one unlocks. They unlock from the statistics the game already saves (skill levels, nodes mined, trees chopped, fish caught, ores and logs sold, tool repairs, gold, crafted tools from the collection, loadstones), so earlier progress counts. Unlocks are kept per account in `progress.json` in the mod folder, and stay when gold is spent or levels reset. Works online and offline; nothing is sent to Steam. Settings: `showPopups` (true), `popupSeconds` (5). Icons: see [Achievement icons](#achievement-icons). |
 | `CloudCodeCapture` | off | Developer tool: plays online and logs Cloud Code traffic to `cloudcode_capture.jsonl`. Disable `offline` to use it. |
 
 Gameplay tweaks are only meant for offline play; online, the server is authoritative.
@@ -238,3 +239,10 @@ in `Mods/Supra` (both folders are git-ignored):
 2. Convert it: `blender -b "toyota-supra/supra free.blend" --python convert_model.py -- Model`.
    This drops hidden parts (brakes, suspension, engine bay), simplifies the wheels, gives each material a flat
    colour (`COLOURS` in the script; the paint is orange) and renders `Model/icon.png`.
+
+### Achievement icons
+
+The achievement icons are the game's art from Steam, so this repo doesn't include them (`Model/Icons` is
+git-ignored). Before `./install.sh`, in `Mods/Achievements`: `python3 fetch_icons.py`. It downloads each
+achievement's unlocked and locked icon from the game's Steam Community page. Without them the tab shows coloured
+squares. `Model/achievements.json` lists the achievements and the statistic and goal that unlock each one.

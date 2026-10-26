@@ -1,0 +1,8 @@
+{
+  "id": "achievements",
+  "name": "Achievements",
+  "version": "1.0.0",
+  "description": "The game's 96 Steam achievements, tracked from your save's statistics and shown in an Achievements tab in the player book, with a pop-up when one unlocks. Unlocks are kept per account in progress.json. Settings: showPopups (true), popupSeconds (5).",
+  "dll": "Achievements.dll",
+  "enabled": true
+}
