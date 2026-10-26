@@ -186,6 +186,8 @@ namespace ArcadiusAchievements
 				rect.sizeDelta = new Vector2(339f, 504f);
 			}
 			_summary.alignment = TextAlignmentOptions.Top;
+			// Clear of the page border at the top.
+			_summary.margin = new Vector4(0f, 30f, 0f, 0f);
 			_summary.richText = true;
 			_summary.textWrappingMode = TextWrappingModes.Normal;
 
@@ -215,7 +217,7 @@ namespace ArcadiusAchievements
 			scrollRect.SetParent(container, false);
 			scrollRect.anchorMin = scrollRect.anchorMax = new Vector2(0.5f, 0.5f);
 			scrollRect.pivot = new Vector2(0.5f, 0.5f);
-			scrollRect.anchoredPosition = new Vector2(x, -40f);
+			scrollRect.anchoredPosition = new Vector2(x + 15f, -40f);
 			scrollRect.sizeDelta = new Vector2(520f, 470f);
 			// Transparent, but it catches the mouse wheel and drags.
 			scroll.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0f);
