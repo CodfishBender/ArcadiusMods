@@ -14,3 +14,5 @@ Mods/Miku/Model/
 # Third-party Supra model: not redistributed, see README (Supra model)
 Mods/Supra/toyota-supra/
 Mods/Supra/Model/
+# Steam achievement icons: the game's art, fetched by Mods/Achievements/fetch_icons.py
+Mods/Achievements/Model/Icons/

@@ -25,7 +25,7 @@ def describe(o):
     if o.type.name != "MonoBehaviour":
         return o.type.name
     try:
-        return "MB:" + o.read().m_Script.read().m_ClassName
+        return "MB:" + o.read(check_read=False).m_Script.read().m_ClassName
     except Exception:
         return "MonoBehaviour"
 
