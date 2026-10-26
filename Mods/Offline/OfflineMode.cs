@@ -13,7 +13,8 @@ namespace ArcadiusOffline
 	// Replaces Unity Gaming Services with local stand-ins and hosts the game world in-process.
 	public static class OfflineMode
 	{
-		private const string PlayerIdKey = "OFFLINE_PLAYER_ID";
+		// SecureSave name.
+		private const string PlayerIdKey = "PlayerId";
 
 		private const string ClientVersion = "1.0.5";
 
@@ -27,12 +28,20 @@ namespace ArcadiusOffline
 			{
 				if (string.IsNullOrEmpty(_playerId))
 				{
-					_playerId = PlayerPrefs.GetString(PlayerIdKey, string.Empty);
+					try
+					{
+						_playerId = SecureSave.Get(PlayerIdKey);
+					}
+					catch (SaveTamperedException)
+					{
+						// The save won't load either; an ID for this session only (SecureSave won't write the file).
+						_playerId = "offline-" + Guid.NewGuid().ToString("N");
+					}
 					if (string.IsNullOrEmpty(_playerId))
 					{
 						_playerId = "offline-" + Guid.NewGuid().ToString("N");
-						PlayerPrefs.SetString(PlayerIdKey, _playerId);
-						PlayerPrefs.Save();
+						SecureSave.Set(PlayerIdKey, _playerId);
+						SecureSave.Save();
 					}
 				}
 				return _playerId;
@@ -80,7 +89,7 @@ namespace ArcadiusOffline
 			{
 				SecureSave.Set(entry.Key, entry.Value);
 			}
-			PlayerPrefs.Save();
+			SecureSave.Save();
 			Debug.Log("[Offline] Saved " + data.Count + " save key(s) to local storage.");
 			return Task.CompletedTask;
 		}

@@ -1,7 +1,7 @@
 {
   "id": "offline",
   "name": "Offline Mode",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Play without Unity Gaming Services: local saves, in-process server, and local contracts, upkeep stations, premium shop and display names.",
   "dll": "ArcadiusOffline.dll",
   "enabled": true

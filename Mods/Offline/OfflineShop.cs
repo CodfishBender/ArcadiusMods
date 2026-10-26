@@ -69,7 +69,7 @@ namespace ArcadiusOffline
 			SavedOwnership saved = Load();
 			saved.purchasedCosmeticIds.Add(item.cosmeticId);
 			SecureSave.Set(OwnedKey, Newtonsoft.Json.JsonConvert.SerializeObject(saved));
-			PlayerPrefs.Save();
+			SecureSave.Save();
 
 			// Spend before saving the character, so the new balance is what gets saved.
 			Playfab_PlayerData.platnum -= item.price;

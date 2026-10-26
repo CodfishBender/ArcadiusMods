@@ -1,42 +1,52 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using UnityEngine;
 
 namespace ArcadiusOffline
 {
-	// Obfuscated, tamper-evident storage for the offline save (PlayerPrefs: the registry, under Proton the prefix's user.reg).
-	// The aim is only that the save can't easily be edited by hand, not real security: the secret is public (in this
-	// source and the DLL), so anyone who reads it can still forge a save. Being fixed, it lets saves move between computers.
-	// Each value is AES-256-CBC encrypted and authenticated with HMAC-SHA256 over its name, IV and ciphertext, so an
-	// edited value, or one copied from another name, fails to load.
-	// Older plaintext saves are migrated once, on first use.
+	// Obfuscated, tamper-evident storage for the offline save: one file, save_data, in the game's root folder (next to
+	// Mods). Nothing is stored in PlayerPrefs (the registry). The aim is only that the save can't easily be edited by
+	// hand, not real security: the secret is public (in this source and the DLL), so anyone who reads it can still forge
+	// a save. Being fixed, it lets the file move between computers.
+	// The file is AES-256-CBC encrypted and authenticated with HMAC-SHA256 over its IV and ciphertext, so an edited file
+	// fails to load, and is then never overwritten. Saves of earlier versions are imported from PlayerPrefs while there
+	// is no save_data yet.
 	public static class SecureSave
 	{
-		private const string Prefix = "OFFLINE_SAVE_";
-
-		// Set once the plaintext saves have been migrated; from then on they are never read again.
-		private const string FormatKey = "OFFLINE_SAVE_FORMAT";
+		private const string FileName = "save_data";
 
 		private const string Format = "OFS1";
 
 		// Do not change: every existing save was written with it and would fail to load. Not a secret (see above).
 		private const string Secret = "af301977e4fe4c91b198c148309a22765a0b3841a73a44edb1a731a44bc0c3f8";
 
-		// Plaintext saves of earlier versions: the game's local Cloud Save cache, and this mod's own stores.
+		// PlayerPrefs saves of earlier versions: 2.1 encrypted each value under this prefix (with the same secret and
+		// format), before that they were plaintext under the legacy keys.
+		private const string RegistryPrefix = "OFFLINE_SAVE_";
+
 		private const string LegacyPlayerPrefix = "UGS_LOCAL_DATA_";
 
 		private static readonly Dictionary<string, string> LegacyStores = new Dictionary<string, string>
 		{
 			{ "MiningContracts", "OFFLINE_MINING_CONTRACTS" },
 			{ "UpkeepStations", "OFFLINE_UPKEEP_STATIONS" },
-			{ "OwnedCosmetics", "OFFLINE_OWNED_COSMETICS" }
+			{ "OwnedCosmetics", "OFFLINE_OWNED_COSMETICS" },
+			{ "PlayerId", "OFFLINE_PLAYER_ID" }
 		};
 
 		private static byte[] _encryptionKey;
 
 		private static byte[] _macKey;
+
+		private static Dictionary<string, string> _values;
+
+		// Set when save_data failed its integrity check: nothing loads from it and it is never overwritten.
+		private static SaveTamperedException _rejected;
+
+		private static string FilePath => Path.Combine(Path.GetDirectoryName(Application.dataPath), FileName);
 
 		// Player data keys the game loads (PlayfabAccountSystem.LoadPlayerDataAsync).
 		private static IEnumerable<string> PlayerDataKeys()
@@ -51,54 +61,116 @@ namespace ArcadiusOffline
 
 		public static bool Has(string name)
 		{
-			EnsureMigrated();
-			return PlayerPrefs.HasKey(Prefix + name);
+			Load();
+			return _values.ContainsKey(name);
 		}
 
-		// Returns null when nothing is saved. Throws SaveTamperedException when the stored value was modified.
+		// Returns null when nothing is saved. Throws SaveTamperedException when save_data was modified.
 		public static string Get(string name)
 		{
-			EnsureMigrated();
-			string stored = PlayerPrefs.GetString(Prefix + name, string.Empty);
-			return string.IsNullOrEmpty(stored) ? null : Decrypt(name, stored);
+			Load();
+			if (_rejected != null)
+			{
+				throw _rejected;
+			}
+			return _values.TryGetValue(name, out string value) ? value : null;
 		}
 
-		// Call PlayerPrefs.Save() afterwards.
+		// Call Save() afterwards to write the file.
 		public static void Set(string name, string value)
 		{
-			EnsureMigrated();
-			PlayerPrefs.SetString(Prefix + name, Encrypt(name, value ?? string.Empty));
+			Load();
+			_values[name] = value ?? string.Empty;
 		}
 
-		private static void EnsureMigrated()
+		// Written to a temporary file first, so a crash mid-write leaves the previous save (or the new one) whole.
+		public static void Save()
 		{
-			if (PlayerPrefs.HasKey(FormatKey))
+			Load();
+			if (_rejected != null)
+			{
+				Debug.LogError("[Offline] Not saving: " + FileName + " failed its integrity check and is kept as it is.");
+				return;
+			}
+			string path = FilePath;
+			string temp = path + ".tmp";
+			File.WriteAllText(temp, Encrypt(FileName, Newtonsoft.Json.JsonConvert.SerializeObject(_values)));
+			if (File.Exists(path))
+			{
+				File.Delete(path);
+			}
+			File.Move(temp, path);
+		}
+
+		private static void Load()
+		{
+			if (_values != null)
 			{
 				return;
 			}
-			int migrated = 0;
+			_values = new Dictionary<string, string>();
+			string path = FilePath;
+			if (!File.Exists(path) && File.Exists(path + ".tmp"))
+			{
+				// Interrupted between deleting the old save and moving the new one in.
+				File.Move(path + ".tmp", path);
+			}
+			if (File.Exists(path))
+			{
+				try
+				{
+					_values = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, string>>(Decrypt(FileName, File.ReadAllText(path)))
+						?? throw new SaveTamperedException(FileName);
+				}
+				catch (Exception ex)
+				{
+					_values = new Dictionary<string, string>();
+					_rejected = ex as SaveTamperedException ?? new SaveTamperedException(FileName);
+					Debug.LogError("[Offline] " + _rejected.Message);
+				}
+				return;
+			}
+			ImportFromPlayerPrefs();
+		}
+
+		// Reads only: the old PlayerPrefs keys are left as they are.
+		private static void ImportFromPlayerPrefs()
+		{
 			foreach (string key in PlayerDataKeys())
 			{
-				migrated += MigrateLegacy(key, LegacyPlayerPrefix + key);
+				Import(key, LegacyPlayerPrefix + key);
 			}
 			foreach (KeyValuePair<string, string> store in LegacyStores)
 			{
-				migrated += MigrateLegacy(store.Key, store.Value);
+				Import(store.Key, store.Value);
 			}
-			// The plaintext keys are left in place (unused), so uninstalling the mod still leaves a readable save.
-			PlayerPrefs.SetString(FormatKey, Format);
-			PlayerPrefs.Save();
-			Debug.Log("[Offline] Encrypted " + migrated + " plaintext save value(s).");
+			if (_values.Count > 0)
+			{
+				Save();
+				Debug.Log("[Offline] Moved " + _values.Count + " save value(s) from PlayerPrefs to " + FilePath + ".");
+			}
 		}
 
-		private static int MigrateLegacy(string name, string legacyKey)
+		private static void Import(string name, string legacyKey)
 		{
-			if (!PlayerPrefs.HasKey(legacyKey) || PlayerPrefs.HasKey(Prefix + name))
+			string encrypted = PlayerPrefs.GetString(RegistryPrefix + name, string.Empty);
+			if (!string.IsNullOrEmpty(encrypted))
 			{
-				return 0;
+				try
+				{
+					_values[name] = Decrypt(name, encrypted);
+					return;
+				}
+				catch (SaveTamperedException ex)
+				{
+					Debug.LogWarning("[Offline] Not importing: " + ex.Message);
+					return;
+				}
 			}
-			PlayerPrefs.SetString(Prefix + name, Encrypt(name, PlayerPrefs.GetString(legacyKey)));
-			return 1;
+			if (PlayerPrefs.HasKey(legacyKey))
+			{
+				_values[name] = PlayerPrefs.GetString(legacyKey);
+			}
 		}
 
 		// Stored as Format + ":" + base64(IV | ciphertext | HMAC).
@@ -163,7 +235,7 @@ namespace ArcadiusOffline
 			}
 		}
 
-		// Covers the value's name too, so a valid value can't be moved to another name.
+		// Covers the value's name too, so a valid value can't be moved to another name (2.1 encrypted each value apart).
 		private static byte[] Mac(string name, byte[] iv, byte[] cipher)
 		{
 			using (HMACSHA256 hmac = new HMACSHA256(_macKey))

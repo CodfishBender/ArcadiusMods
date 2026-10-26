@@ -181,7 +181,7 @@ namespace ArcadiusOffline
 		private static void Save(SavedState saved)
 		{
 			SecureSave.Set(StateKey, Newtonsoft.Json.JsonConvert.SerializeObject(saved));
-			PlayerPrefs.Save();
+			SecureSave.Save();
 		}
 
 		private static DateTime NextReset(DateTime utcNow)
