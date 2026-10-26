@@ -12,8 +12,8 @@ namespace ArcadiusAchievements
 	// (Account, Bag, Skills, Collections, Crafting, Ranks, Settings) and BagHandler.SetBookActive shows one
 	// panel per tab. This adds a copy of the Skills button after Ranks and a copy of the Skills panel: its title
 	// and page art stay, its skill rows become a scrolling list of achievements on the left page, and the text
-	// on the right page becomes a summary per category. The button opens the book on Skills, then swaps in
-	// this panel; any other tab hides it again.
+	// on the right page becomes the unlocked count above the Show and Type filters. The button opens the book
+	// on Skills, then swaps in this panel; any other tab hides it again.
 	internal static class AchievementsTab
 	{
 		private const string PanelName = "Book_Achievements_Menu";
@@ -26,11 +26,36 @@ namespace ArcadiusAchievements
 
 		private static readonly List<Row> Rows = new List<Row>();
 
+		// The Type filter's "All types", also the key of the totals in Refresh.
+		private const string AllTypes = "";
+
+		private static readonly List<string> Categories = new List<string>();
+
+		private static readonly List<FilterButton> StatusButtons = new List<FilterButton>();
+
+		private static readonly List<FilterButton> CategoryButtons = new List<FilterButton>();
+
 		private static GameObject _panel;
 
 		private static TextMeshProUGUI _summary;
 
+		private static ScrollRect _list;
+
+		private static GameObject _empty;
+
+		// Kept while the game runs, so the book reopens with the same filters.
+		private static Status _status = Status.All;
+
+		private static string _category = AllTypes;
+
 		public static TMP_FontAsset Font;
+
+		private enum Status
+		{
+			All,
+			Obtained,
+			Unobtained
+		}
 
 		public static void Patch(Harmony harmony)
 		{
@@ -66,35 +91,57 @@ namespace ArcadiusAchievements
 			{
 				return;
 			}
-			var categories = new List<string>();
-			var unlockedIn = new Dictionary<string, int>();
-			var totalIn = new Dictionary<string, int>();
-			int unlockedCount = 0;
+			// Counts per category; AllTypes counts every category.
+			var unlockedIn = new Dictionary<string, int> { [AllTypes] = 0 };
+			var totalIn = new Dictionary<string, int> { [AllTypes] = 0 };
+			int shown = 0;
 			foreach (Row row in Rows)
 			{
 				bool unlocked = row.Update();
-				string category = row.Achievement.category ?? "Other";
-				if (!totalIn.ContainsKey(category))
+				string category = row.Category;
+				foreach (string key in new[] { AllTypes, category })
 				{
-					categories.Add(category);
-					totalIn[category] = 0;
-					unlockedIn[category] = 0;
+					totalIn[key] = (totalIn.TryGetValue(key, out int total) ? total : 0) + 1;
+					unlockedIn[key] = (unlockedIn.TryGetValue(key, out int count) ? count : 0) + (unlocked ? 1 : 0);
 				}
-				totalIn[category]++;
-				if (unlocked)
+				bool show = (_category == AllTypes || _category == category)
+					&& (_status == Status.All || unlocked == (_status == Status.Obtained));
+				if (row.Root.activeSelf != show)
 				{
-					unlockedIn[category]++;
-					unlockedCount++;
+					row.Root.SetActive(show);
 				}
+				shown += show ? 1 : 0;
 			}
-			var summary = new StringBuilder();
-			summary.Append($"<size=150%><b>{unlockedCount} / {Rows.Count}</b></size>\nunlocked");
-			summary.Append($" ({(Rows.Count == 0 ? 0 : unlockedCount * 100 / Rows.Count)}%)\n\n");
-			foreach (string category in categories)
+			int all = totalIn[AllTypes];
+			int obtained = unlockedIn[AllTypes];
+			_summary.text = $"<size=150%><b>{obtained} / {all}</b></size>\nunlocked ({(all == 0 ? 0 : obtained * 100 / all)}%)";
+			_empty.SetActive(shown == 0);
+
+			// The Show counts are within the selected type.
+			int inType = totalIn.TryGetValue(_category, out int typeTotal) ? typeTotal : 0;
+			int obtainedInType = unlockedIn.TryGetValue(_category, out int typeCount) ? typeCount : 0;
+			StatusButtons[0].Set($"All ({inType})", _status == Status.All);
+			StatusButtons[1].Set($"Obtained ({obtainedInType})", _status == Status.Obtained);
+			StatusButtons[2].Set($"Unobtained ({inType - obtainedInType})", _status == Status.Unobtained);
+			for (int i = 0; i < Categories.Count; i++)
 			{
-				summary.Append($"{category}: {unlockedIn[category]} / {totalIn[category]}\n");
+				string category = Categories[i];
+				string name = category == AllTypes ? "All types" : category;
+				int total = totalIn.TryGetValue(category, out int t) ? t : 0;
+				int done = unlockedIn.TryGetValue(category, out int d) ? d : 0;
+				CategoryButtons[i].Set($"{name}  <alpha=#99>{done} / {total}", _category == category);
 			}
-			_summary.text = summary.ToString();
+		}
+
+		private static void SetFilter(Status status, string category)
+		{
+			_status = status;
+			_category = category;
+			Refresh();
+			if (_list != null)
+			{
+				_list.verticalNormalizedPosition = 1f;
+			}
 		}
 
 		private static void Build(BagHandler bag)
@@ -198,12 +245,27 @@ namespace ArcadiusAchievements
 			_summary.richText = true;
 			_summary.textWrappingMode = TextWrappingModes.Normal;
 
+			Categories.Clear();
+			Categories.Add(AllTypes);
+			foreach (Achievement achievement in AchievementsEntry.All)
+			{
+				if (!Categories.Contains(Row.CategoryOf(achievement)))
+				{
+					Categories.Add(Row.CategoryOf(achievement));
+				}
+			}
+			if (!Categories.Contains(_category))
+			{
+				_category = AllTypes;
+			}
+			CreateFilters(_summary);
+
 			// The list takes the place of the skill rows on the left page; the first row is the template.
 			RectTransform holderRect = (RectTransform)holder;
 			Transform template = holder.GetChild(0);
 			template.SetParent(_panel.transform, false);
 			template.gameObject.SetActive(false);
-			RectTransform content = CreateScrollList(container, holderRect.anchoredPosition.x);
+			RectTransform content = CreateScrollList(container, holderRect.anchoredPosition.x, _summary);
 			Object.Destroy(holder.gameObject);
 
 			Rows.Clear();
@@ -216,8 +278,69 @@ namespace ArcadiusAchievements
 			Log.Info($"Achievements tab added ({Rows.Count} rows)");
 		}
 
+		// The filters on the right page, under the unlocked count: Show (All, Obtained, Unobtained) in a row,
+		// then Type (All types and each category) in a column. Each group works like radio buttons.
+		private static void CreateFilters(TextMeshProUGUI style)
+		{
+			GameObject filters = new GameObject("Filters", typeof(RectTransform), typeof(VerticalLayoutGroup));
+			RectTransform rect = (RectTransform)filters.transform;
+			rect.SetParent(style.rectTransform, false);
+			rect.anchorMin = Vector2.zero;
+			rect.anchorMax = Vector2.one;
+			// Below the two lines of the unlocked count.
+			rect.offsetMin = new Vector2(10f, 0f);
+			rect.offsetMax = new Vector2(-10f, -100f);
+			VerticalLayoutGroup layout = filters.GetComponent<VerticalLayoutGroup>();
+			layout.childControlWidth = true;
+			layout.childControlHeight = true;
+			layout.childForceExpandWidth = true;
+			layout.childForceExpandHeight = false;
+			layout.spacing = 5f;
+
+			Heading(rect, style, "Show");
+			GameObject statusRow = new GameObject("Show", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+			statusRow.transform.SetParent(rect, false);
+			statusRow.GetComponent<LayoutElement>().preferredHeight = 34f;
+			HorizontalLayoutGroup row = statusRow.GetComponent<HorizontalLayoutGroup>();
+			row.childControlWidth = true;
+			row.childControlHeight = true;
+			row.childForceExpandWidth = true;
+			row.childForceExpandHeight = true;
+			row.spacing = 5f;
+			StatusButtons.Clear();
+			foreach (Status status in new[] { Status.All, Status.Obtained, Status.Unobtained })
+			{
+				StatusButtons.Add(new FilterButton(statusRow.transform, style, 34f, () => SetFilter(status, _category)));
+			}
+
+			LayoutElement gap = new GameObject("Gap", typeof(RectTransform), typeof(LayoutElement)).GetComponent<LayoutElement>();
+			gap.transform.SetParent(rect, false);
+			gap.preferredHeight = 4f;
+			Heading(rect, style, "Type");
+			CategoryButtons.Clear();
+			foreach (string category in Categories)
+			{
+				CategoryButtons.Add(new FilterButton(rect, style, 30f, () => SetFilter(_status, category)));
+			}
+		}
+
+		private static void Heading(Transform parent, TextMeshProUGUI style, string text)
+		{
+			GameObject go = new GameObject(text + " heading", typeof(RectTransform), typeof(LayoutElement));
+			go.transform.SetParent(parent, false);
+			go.GetComponent<LayoutElement>().preferredHeight = 22f;
+			TextMeshProUGUI label = go.AddComponent<TextMeshProUGUI>();
+			label.font = style.font;
+			label.fontSize = 18f;
+			label.fontStyle = FontStyles.Bold;
+			label.color = style.color;
+			label.alignment = TextAlignmentOptions.BottomLeft;
+			label.raycastTarget = false;
+			label.text = text;
+		}
+
 		// A vertical scroll list centred at x on the left page, under the title; returns its content.
-		private static RectTransform CreateScrollList(Transform container, float x)
+		private static RectTransform CreateScrollList(Transform container, float x, TextMeshProUGUI style)
 		{
 			GameObject scroll = new GameObject("AchievementList", typeof(RectTransform), typeof(Image), typeof(ScrollRect));
 			RectTransform scrollRect = (RectTransform)scroll.transform;
@@ -263,6 +386,24 @@ namespace ArcadiusAchievements
 			list.scrollSensitivity = 10f;
 			list.verticalScrollbar = CreateScrollbar(scrollRect);
 			list.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+			_list = list;
+
+			// Shown instead of the list when the filters leave nothing.
+			GameObject empty = new GameObject("Empty", typeof(RectTransform));
+			RectTransform emptyRect = (RectTransform)empty.transform;
+			emptyRect.SetParent(viewportRect, false);
+			emptyRect.anchorMin = Vector2.zero;
+			emptyRect.anchorMax = Vector2.one;
+			emptyRect.offsetMin = emptyRect.offsetMax = Vector2.zero;
+			TextMeshProUGUI emptyText = empty.AddComponent<TextMeshProUGUI>();
+			emptyText.font = style.font;
+			emptyText.fontSize = 20f;
+			emptyText.color = style.color;
+			emptyText.alignment = TextAlignmentOptions.Center;
+			emptyText.raycastTarget = false;
+			emptyText.text = "No achievements here.";
+			empty.SetActive(false);
+			_empty = empty;
 			return contentRect;
 		}
 
@@ -324,6 +465,10 @@ namespace ArcadiusAchievements
 		{
 			public readonly Achievement Achievement;
 
+			public readonly GameObject Root;
+
+			public readonly string Category;
+
 			private readonly Image _icon;
 
 			private readonly Image _fill;
@@ -339,6 +484,8 @@ namespace ArcadiusAchievements
 			public Row(Achievement achievement, GameObject row)
 			{
 				Achievement = achievement;
+				Root = row;
+				Category = CategoryOf(achievement);
 				row.name = achievement.id;
 				row.SetActive(true);
 				LayoutElement element = row.GetComponent<LayoutElement>();
@@ -417,6 +564,65 @@ namespace ArcadiusAchievements
 				}
 				_group.alpha = unlocked ? 1f : 0.6f;
 				return unlocked;
+			}
+
+			public static string CategoryOf(Achievement achievement)
+			{
+				return string.IsNullOrEmpty(achievement.category) ? "Other" : achievement.category;
+			}
+		}
+
+		// One option of a filter group: filled in the book's brown when selected, faint otherwise.
+		private sealed class FilterButton
+		{
+			private static readonly Color Selected = new Color(0.4f, 0.27f, 0.15f, 0.9f);
+
+			private static readonly Color Unselected = new Color(0.25f, 0.17f, 0.1f, 0.15f);
+
+			private static readonly Color SelectedText = new Color(1f, 0.95f, 0.85f);
+
+			private readonly Image _background;
+
+			private readonly TextMeshProUGUI _label;
+
+			private readonly Color _text;
+
+			public FilterButton(Transform parent, TextMeshProUGUI style, float height, UnityEngine.Events.UnityAction clicked)
+			{
+				GameObject go = new GameObject("Filter", typeof(RectTransform), typeof(Image), typeof(Button), typeof(LayoutElement));
+				go.transform.SetParent(parent, false);
+				LayoutElement element = go.GetComponent<LayoutElement>();
+				element.preferredHeight = height;
+				element.flexibleWidth = 1f;
+				_background = go.GetComponent<Image>();
+				Button button = go.GetComponent<Button>();
+				button.targetGraphic = _background;
+				button.onClick.AddListener(clicked);
+
+				GameObject text = new GameObject("Text", typeof(RectTransform));
+				RectTransform rect = (RectTransform)text.transform;
+				rect.SetParent(go.transform, false);
+				rect.anchorMin = Vector2.zero;
+				rect.anchorMax = Vector2.one;
+				rect.offsetMin = new Vector2(6f, 0f);
+				rect.offsetMax = new Vector2(-6f, 0f);
+				_label = text.AddComponent<TextMeshProUGUI>();
+				_label.font = style.font;
+				_label.fontSize = 17f;
+				_label.enableAutoSizing = true;
+				_label.fontSizeMin = 10f;
+				_label.fontSizeMax = 17f;
+				_label.alignment = TextAlignmentOptions.Center;
+				_label.textWrappingMode = TextWrappingModes.NoWrap;
+				_label.raycastTarget = false;
+				_text = style.color;
+			}
+
+			public void Set(string text, bool selected)
+			{
+				_label.text = text;
+				_label.color = selected ? SelectedText : _text;
+				_background.color = selected ? Selected : Unselected;
 			}
 		}
 	}
