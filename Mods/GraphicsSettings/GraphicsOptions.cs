@@ -66,8 +66,6 @@ namespace ArcadiusGraphicsSettings
 		// The player's camera and what the game set on it.
 		private static Camera _camera;
 
-		private static float _nextCameraSearch;
-
 		private static float _gameFieldOfView = 60f;
 
 		private static AntialiasingMode _gameCameraAntiAliasing;
@@ -79,6 +77,8 @@ namespace ArcadiusGraphicsSettings
 		private static Bloom _bloom;
 
 		private static Vignette _vignette;
+
+		private static UniversalRenderPipelineAsset _appliedPipeline;
 
 		private static readonly HashSet<UniversalRenderPipelineAsset> Warned = new HashSet<UniversalRenderPipelineAsset>();
 
@@ -252,7 +252,16 @@ namespace ArcadiusGraphicsSettings
 			ApplyCamera();
 			ApplyVolume();
 			FpsCounter.SetVisible(ShowFps, FpsCorner);
+			if (!_logged)
+			{
+				_logged = true;
+				Log.Info("Applied the saved settings: FPS limit " + (FpsLimit > 0 ? FpsLimit.ToString() : "unlimited") + ", VSync " + (VSync ? "on" : "off") +
+					", render scale " + RenderScale + "%, shadows " + ShadowNames[Shadows] + " to " + ShadowDistance + " m, textures " + TextureNames[Textures] +
+					" (pipeline " + (Pipeline != null ? Pipeline.name : "none") + ").");
+			}
 		}
+
+		private static bool _logged;
 
 		private static void ApplyPipeline(UniversalRenderPipelineAsset asset)
 		{
@@ -260,6 +269,7 @@ namespace ArcadiusGraphicsSettings
 			{
 				return;
 			}
+			_appliedPipeline = asset;
 			asset.renderScale = RenderScale / 100f;
 			asset.upscalingFilter = UpscalingFilters[Upscaling];
 			asset.shadowDistance = ShadowDistance;
@@ -318,25 +328,112 @@ namespace ArcadiusGraphicsSettings
 			return found;
 		}
 
-		// Every frame: finds the player's camera when it appears and keeps its field of view.
+		// Every frame: keeps the camera's field of view. Every second: finds the player's camera when it appears,
+		// and applies the settings again if the game changed one of them back.
 		public static void Update()
 		{
-			if (_camera == null)
-			{
-				if (Time.unscaledTime < _nextCameraSearch)
-				{
-					return;
-				}
-				_nextCameraSearch = Time.unscaledTime + 1f;
-				if (!FindCamera())
-				{
-					return;
-				}
-			}
-			if (!Mathf.Approximately(_camera.fieldOfView, FieldOfView))
+			if (_camera != null && !Mathf.Approximately(_camera.fieldOfView, FieldOfView))
 			{
 				_camera.fieldOfView = FieldOfView;
 			}
+			if (!_read || Time.unscaledTime < _nextCheck)
+			{
+				return;
+			}
+			_nextCheck = Time.unscaledTime + 1f;
+			if (_camera == null && FindCamera())
+			{
+				return;
+			}
+			string changed = Changed();
+			if (changed != null)
+			{
+				// Once per setting, so a game that keeps resetting one doesn't flood the log.
+				if (Reported.Add(changed))
+				{
+					Log.Info("The game changed " + changed + "; applying the saved settings again.");
+				}
+				Apply();
+			}
+		}
+
+		private static float _nextCheck;
+
+		private static readonly HashSet<string> Reported = new HashSet<string>();
+
+		// The first of the applied settings that no longer holds, or null.
+		private static string Changed()
+		{
+			if (QualitySettings.vSyncCount != (VSync ? 1 : 0))
+			{
+				return "VSync";
+			}
+			if (Application.targetFrameRate != (FpsLimit > 0 ? FpsLimit : -1))
+			{
+				return "the frame rate limit (" + Application.targetFrameRate + ")";
+			}
+			if (QualitySettings.globalTextureMipmapLimit != Textures)
+			{
+				return "the texture quality";
+			}
+			if (QualitySettings.anisotropicFiltering != (AnisotropicFiltering)Anisotropic)
+			{
+				return "anisotropic filtering";
+			}
+			if (!Mathf.Approximately(QualitySettings.lodBias, _gameLodBias * DetailDistance / 100f))
+			{
+				return "the detail distance";
+			}
+			UniversalRenderPipelineAsset asset = Pipeline;
+			if (asset != null)
+			{
+				if (asset != _appliedPipeline)
+				{
+					return "the render pipeline asset (" + asset.name + ")";
+				}
+				if (!Mathf.Approximately(asset.renderScale, RenderScale / 100f))
+				{
+					return "the render scale";
+				}
+				if (asset.upscalingFilter != UpscalingFilters[Upscaling])
+				{
+					return "the upscaling filter";
+				}
+				if (!Mathf.Approximately(asset.shadowDistance, ShadowDistance))
+				{
+					return "the shadow distance";
+				}
+				if ((MainLightShadowsField != null && asset.supportsMainLightShadows != Shadows > 0) ||(Shadows > 0 && asset.mainLightShadowmapResolution != ShadowResolutions[Shadows]))
+				{
+					return "the shadow quality";
+				}
+				if (CameraFound && asset.msaaSampleCount != (AntiAliasing >= 4 ? 1 << (AntiAliasing - 3) : 1))
+				{
+					return "MSAA";
+				}
+			}
+			if (_camera != null && (_camera.allowMSAA != AntiAliasing >= 4 || CameraAntiAliasing(_camera) != AntiAliasingMode(AntiAliasing)))
+			{
+				return "the camera's anti-aliasing";
+			}
+			return null;
+		}
+
+		private static AntialiasingMode? CameraAntiAliasing(Camera camera)
+		{
+			UniversalAdditionalCameraData data = camera.GetUniversalAdditionalCameraData();
+			return data != null ? data.antialiasing : (AntialiasingMode?)null;
+		}
+
+		private static AntialiasingMode AntiAliasingMode(int setting)
+		{
+			return setting switch
+			{
+				1 => AntialiasingMode.FastApproximateAntialiasing,
+				2 => AntialiasingMode.SubpixelMorphologicalAntiAliasing,
+				3 => AntialiasingMode.TemporalAntiAliasing,
+				_ => AntialiasingMode.None
+			};
 		}
 
 		private static bool FindCamera()
@@ -353,8 +450,10 @@ namespace ArcadiusGraphicsSettings
 			UniversalAdditionalCameraData data = camera.GetUniversalAdditionalCameraData();
 			_gameCameraAntiAliasing = data != null ? data.antialiasing : AntialiasingMode.None;
 			ReadCameraSettings();
-			ApplyCamera();
+			// Everything, as MSAA on the pipeline asset waits for the camera's anti-aliasing setting.
+			Apply();
 			SettingsMenu.Refresh();
+			Log.Info("Applied to the player's camera: field of view " + FieldOfView + ", anti-aliasing " + AntiAliasingNames[AntiAliasing] + ".");
 			return true;
 		}
 
@@ -369,13 +468,7 @@ namespace ArcadiusGraphicsSettings
 			UniversalAdditionalCameraData data = _camera.GetUniversalAdditionalCameraData();
 			if (data != null)
 			{
-				data.antialiasing = AntiAliasing switch
-				{
-					1 => AntialiasingMode.FastApproximateAntialiasing,
-					2 => AntialiasingMode.SubpixelMorphologicalAntiAliasing,
-					3 => AntialiasingMode.TemporalAntiAliasing,
-					_ => AntialiasingMode.None
-				};
+				data.antialiasing = AntiAliasingMode(AntiAliasing);
 				data.antialiasingQuality = AntialiasingQuality.High;
 			}
 		}
