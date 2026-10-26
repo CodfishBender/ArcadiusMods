@@ -237,4 +237,5 @@ in `Mods/Supra` (both folders are git-ignored):
 1. Put the `.blend` in `toyota-supra/`.
 2. Convert it: `blender -b "toyota-supra/supra free.blend" --python convert_model.py -- Model`.
    This drops hidden parts (brakes, suspension, engine bay), simplifies the wheels, gives each material a flat
-   colour (`COLOURS` in the script; the paint is orange) and renders `Model/icon.png`.
+   colour (`COLOURS` in the script; the paint is orange), adds a bonnet (the free model has none) and renders
+   `Model/icon.png`.

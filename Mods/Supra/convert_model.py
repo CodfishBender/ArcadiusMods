@@ -1,6 +1,7 @@
 # Converts the Toyota Supra .blend into Model/supra.json (flat-coloured body and four wheels) and renders the
 # wardrobe icon (Model/icon.png), for SupraResources.cs. It's a gag: hidden parts (brakes, suspension, engine bay,
-# rivets, screws) are dropped, the wheels are simplified, and every material becomes a flat colour.
+# rivets, screws) are dropped, the wheels are simplified, and every material becomes a flat colour. The free
+# model has no bonnet (the engine bay is open), so one is made to fit the gap between the wings.
 # Usage: blender -b <supra.blend> --python convert_model.py -- <out dir>
 #
 # Output is in Unity's axes (Y up, +Z forward, left-handed) in metres, with the wheels' bottoms at y = 0 and the
@@ -37,6 +38,12 @@ DEFAULT = (0.3, 0.3, 0.3)
 SKIP_MATERIALS = {"Shock Absorber", "Brake Caliper", "Brake Disc", "rivet", "screw", "gauges", "engine bay", "eng", "radiator"}
 WHEEL_MATERIAL = "wheel"
 WHEEL_DECIMATE = 0.2
+# Bonnet: grid size, half width (metres, it tucks under the wings), how far below the wing tops it sits, and
+# how much higher its middle is than its edges.
+BONNET_GRID = (12, 18)
+BONNET_HALF_WIDTH = 1.0
+BONNET_DROP = 0.01
+BONNET_CROWN = 0.04
 
 
 def evaluated_mesh(obj):
@@ -85,6 +92,8 @@ def main():
     front_positive = bumper is not None and (bumper.matrix_world @ bumper.data.vertices[0].co).y > 0
     # Unity: Y up, +Z forward. Mirrors one axis either way, so the winding is reversed below.
     to_unity = (lambda v: (v[0], v[2], v[1])) if front_positive else (lambda v: (-v[0], v[2], -v[1]))
+    # The inverse, for putting the made-up bonnet into the icon render.
+    from_unity = (lambda v: (v[0], v[2], v[1])) if front_positive else (lambda v: (-v[0], -v[2], v[1]))
 
     groups = {}
     wheel_parts = []
@@ -130,6 +139,8 @@ def main():
         x, y, z = part["centre"]
         part["centre"] = (x, y - floor, z)
 
+    bonnet_vertices, bonnet_faces = add_bonnet(groups)
+
     flat = lambda rows, digits: [round(c, digits) for row in rows for c in row]
     body = [{"colour": list(colour), "vertices": flat(g["vertices"], 4), "normals": flat(g["normals"], 3), "triangles": g["triangles"]} for colour, g in groups.items()]
     wheels_out = [{"centre": [round(c, 4) for c in w["centre"]], "radius": round(w["radius"], 4), "colour": list(COLOURS[WHEEL_MATERIAL]),
@@ -139,13 +150,84 @@ def main():
     with open(os.path.join(out, "supra.json"), "w") as f:
         json.dump({"length": round(length, 4), "body": body, "wheels": wheels_out}, f, separators=(",", ":"))
 
-    render_icon(objects, os.path.join(out, "icon.png"))
+    bonnet_mesh = bpy.data.meshes.new("Bonnet")
+    bonnet_mesh.from_pydata([from_unity((x, y + floor, z)) for x, y, z in bonnet_vertices], [], bonnet_faces)
+    bonnet = bpy.data.objects.new("Bonnet", bonnet_mesh)
+    bonnet.data.materials.append(bpy.data.materials["Livery"])
+    bpy.context.scene.collection.objects.link(bonnet)
+    render_icon(objects + [bonnet], os.path.join(out, "icon.png"))
 
     print("Wrote body: %d colours, %d triangles; wheels: %s; length %.2f m; front at Blender %sY; skipped %d hidden-part triangles" % (
         len(body), sum(len(g["triangles"]) for g in body) // 3, [len(w["triangles"]) // 3 for w in wheels_out], length,
         "+" if front_positive else "-", skipped))
     for w in wheels_out:
         print("  wheel centre %s radius %.3f" % (tuple(w["centre"]), w["radius"]))
+
+
+def add_bonnet(groups):
+    # A curved panel from under the windscreen's base to just behind the headlights' front. At each point along the car
+    # it follows the tops of the wings (the paint's highest points near the sides), crowned in the middle.
+    paint = groups[COLOURS["Livery"]]
+    # Starts a little under the windscreen so no gap shows at the base.
+    rear = max(v[2] for v in groups[COLOURS["Glass"]]["vertices"]) - 0.12
+    front = max(v[2] for v in groups[COLOURS["headlights"]]["vertices"]) - 0.15
+    wings = [v for v in paint["vertices"] if 0.8 < abs(v[0]) < 1.1 and rear - 0.1 < v[2] < front + 0.2]
+    slices = 24
+    tops = []
+    for i in range(slices + 1):
+        z = rear + (front - rear) * i / slices
+        near = [v[1] for v in wings if abs(v[2] - z) < (front - rear) / slices]
+        tops.append(max(near) if near else None)
+    known = [t for t in tops if t is not None]
+    if not known:
+        raise SystemExit("Couldn't find the wings to fit a bonnet to")
+    for i, t in enumerate(tops):
+        if t is None:
+            tops[i] = known[0] if i == 0 else tops[i - 1]
+    # A bonnet only slopes down towards the front: a slice that only caught low points (door gap) takes the height
+    # of the slice in front of it.
+    for i in range(slices - 1, -1, -1):
+        tops[i] = max(tops[i], tops[i + 1])
+
+    def height(x, z):
+        f = (z - rear) / (front - rear) * slices
+        i = min(slices - 1, max(0, int(f)))
+        top = tops[i] + (tops[i + 1] - tops[i]) * (f - i)
+        return top - BONNET_DROP + BONNET_CROWN * (1 - (x / BONNET_HALF_WIDTH) ** 2)
+
+    nx, nz = BONNET_GRID
+    grid = [[None] * (nx + 1) for _ in range(nz + 1)]
+    for j in range(nz + 1):
+        for i in range(nx + 1):
+            x = -BONNET_HALF_WIDTH + 2 * BONNET_HALF_WIDTH * i / nx
+            z = rear + (front - rear) * j / nz
+            grid[j][i] = (x, height(x, z), z)
+
+    def normal(i, j):
+        a = grid[j][min(i + 1, nx)]; b = grid[j][max(i - 1, 0)]
+        c = grid[min(j + 1, nz)][i]; d = grid[max(j - 1, 0)][i]
+        tx = [a[k] - b[k] for k in range(3)]; tz = [c[k] - d[k] for k in range(3)]
+        n = (tz[1] * tx[2] - tz[2] * tx[1], tz[2] * tx[0] - tz[0] * tx[2], tz[0] * tx[1] - tz[1] * tx[0])
+        if n[1] < 0:
+            n = tuple(-c for c in n)
+        length = sum(c * c for c in n) ** 0.5
+        return tuple(c / length for c in n)
+
+    start = len(paint["vertices"])
+    for j in range(nz + 1):
+        for i in range(nx + 1):
+            paint["vertices"].append(grid[j][i])
+            paint["normals"].append(normal(i, j))
+    index = lambda i, j: start + j * (nx + 1) + i
+    faces = []
+    for j in range(nz):
+        for i in range(nx):
+            a, b, c, d = index(i, j), index(i + 1, j), index(i + 1, j + 1), index(i, j + 1)
+            # Unity's front faces are clockwise seen from above (+Y): rear-left, front-left, front-right.
+            paint["triangles"] += [a, d, c, a, c, b]
+            faces.append((a - start, b - start, c - start, d - start))
+    print("Added a bonnet: z %.2f..%.2f, height %.2f..%.2f m" % (rear, front, min(tops) - BONNET_DROP, max(tops) - BONNET_DROP + BONNET_CROWN))
+    return [v for row in grid for v in row], faces
 
 
 def render_icon(objects, path):
