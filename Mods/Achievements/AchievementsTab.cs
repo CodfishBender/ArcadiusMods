@@ -260,7 +260,7 @@ namespace ArcadiusAchievements
 			list.horizontal = false;
 			list.vertical = true;
 			list.movementType = ScrollRect.MovementType.Clamped;
-			list.scrollSensitivity = 20f;
+			list.scrollSensitivity = 10f;
 			list.verticalScrollbar = CreateScrollbar(scrollRect);
 			list.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
 			return contentRect;
