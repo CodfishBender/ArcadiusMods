@@ -20,6 +20,8 @@ namespace ArcadiusAchievements
 
 		private const float RowHeight = 100f;
 
+		private const float ScrollbarWidth = 10f;
+
 		private static readonly ModLog Log = new ModLog("achievements");
 
 		private static readonly List<Row> Rows = new List<Row>();
@@ -175,6 +177,11 @@ namespace ArcadiusAchievements
 			if (title != null)
 			{
 				title.text = "Achievements";
+				// Longer than "Skills": shrink to fit the title's box instead of running off the page.
+				title.textWrappingMode = TextWrappingModes.NoWrap;
+				title.fontSizeMax = title.fontSize;
+				title.fontSizeMin = Mathf.Min(12f, title.fontSize);
+				title.enableAutoSizing = true;
 			}
 			if (_summary == null)
 			{
@@ -227,7 +234,9 @@ namespace ArcadiusAchievements
 			viewportRect.SetParent(scrollRect, false);
 			viewportRect.anchorMin = Vector2.zero;
 			viewportRect.anchorMax = Vector2.one;
-			viewportRect.offsetMin = viewportRect.offsetMax = Vector2.zero;
+			viewportRect.offsetMin = Vector2.zero;
+			// Room on the right for the scrollbar.
+			viewportRect.offsetMax = new Vector2(-(ScrollbarWidth + 6f), 0f);
 
 			GameObject content = new GameObject("Content", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
 			RectTransform contentRect = (RectTransform)content.transform;
@@ -242,7 +251,7 @@ namespace ArcadiusAchievements
 			layout.childForceExpandWidth = true;
 			layout.childForceExpandHeight = false;
 			layout.spacing = 4f;
-			layout.padding = new RectOffset(0, 10, 0, 0);
+			layout.padding = new RectOffset(0, 4, 0, 0);
 			content.GetComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
 			ScrollRect list = scroll.GetComponent<ScrollRect>();
@@ -252,7 +261,47 @@ namespace ArcadiusAchievements
 			list.vertical = true;
 			list.movementType = ScrollRect.MovementType.Clamped;
 			list.scrollSensitivity = 40f;
+			list.verticalScrollbar = CreateScrollbar(scrollRect);
+			list.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
 			return contentRect;
+		}
+
+		// A thin vertical scrollbar along the right edge of the list, in the book's brown.
+		private static Scrollbar CreateScrollbar(RectTransform list)
+		{
+			GameObject bar = new GameObject("Scrollbar", typeof(RectTransform), typeof(Image), typeof(Scrollbar));
+			RectTransform barRect = (RectTransform)bar.transform;
+			barRect.SetParent(list, false);
+			barRect.anchorMin = new Vector2(1f, 0f);
+			barRect.anchorMax = Vector2.one;
+			barRect.pivot = new Vector2(1f, 0.5f);
+			barRect.offsetMin = new Vector2(-ScrollbarWidth, 0f);
+			barRect.offsetMax = Vector2.zero;
+			bar.GetComponent<Image>().color = new Color(0.25f, 0.17f, 0.1f, 0.25f);
+
+			GameObject area = new GameObject("Sliding Area", typeof(RectTransform));
+			RectTransform areaRect = (RectTransform)area.transform;
+			areaRect.SetParent(barRect, false);
+			areaRect.anchorMin = Vector2.zero;
+			areaRect.anchorMax = Vector2.one;
+			areaRect.offsetMin = areaRect.offsetMax = Vector2.zero;
+
+			GameObject handle = new GameObject("Handle", typeof(RectTransform), typeof(Image));
+			RectTransform handleRect = (RectTransform)handle.transform;
+			handleRect.SetParent(areaRect, false);
+			handleRect.offsetMin = handleRect.offsetMax = Vector2.zero;
+			Image handleImage = handle.GetComponent<Image>();
+			handleImage.color = new Color(0.4f, 0.27f, 0.15f, 0.9f);
+
+			Scrollbar scrollbar = bar.GetComponent<Scrollbar>();
+			scrollbar.handleRect = handleRect;
+			scrollbar.targetGraphic = handleImage;
+			scrollbar.direction = Scrollbar.Direction.BottomToTop;
+			ColorBlock colors = scrollbar.colors;
+			colors.highlightedColor = new Color(1.15f, 1.15f, 1.15f, 1f);
+			colors.pressedColor = new Color(0.8f, 0.8f, 0.8f, 1f);
+			scrollbar.colors = colors;
+			return scrollbar;
 		}
 
 		private static void Open()
