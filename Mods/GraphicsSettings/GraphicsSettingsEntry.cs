@@ -5,7 +5,8 @@ using TrilliumStudio;
 namespace ArcadiusGraphicsSettings
 {
 	// More display and graphics settings on the game's Settings page. The game only has quality, resolution,
-	// fullscreen, sensitivity and volume, and caps the frame rate at 60 (GameManager.Awake).
+	// fullscreen, sensitivity and volume, and caps the frame rate at 60 (GameManager.Awake). DisplayMemory makes
+	// the game's own quality and fullscreen settings stick.
 	public sealed class GraphicsSettingsEntry : IMod
 	{
 		internal static ModContext Context;
@@ -25,6 +26,7 @@ namespace ArcadiusGraphicsSettings
 			// UserInterfaceBehaviour is a NetworkBehaviour, so it's named rather than referenced.
 			harmony.Patch(AccessTools.Method("UserInterfaceBehaviour:OpenSettings"),
 				postfix: new HarmonyMethod(typeof(GraphicsSettingsEntry), nameof(AfterOpenSettings)));
+			DisplayMemory.Patch(harmony);
 
 			ModEvents.SceneLoaded += _ => GraphicsOptions.Apply();
 			ModEvents.Update += () =>

@@ -2,7 +2,7 @@
   "id": "graphicssettings",
   "name": "Graphics Settings",
   "version": "1.0.0",
-  "description": "More display and graphics options in the Settings menu: FPS limit, VSync, field of view, render scale, anti-aliasing, shadows, textures, detail distance, bloom, vignette, ambient occlusion and an FPS counter. Saved in config.json.",
+  "description": "More display and graphics options in the Settings menu: FPS limit, VSync, field of view, render scale, anti-aliasing, shadows, textures, detail distance, bloom, vignette, ambient occlusion and an FPS counter. Also remembers Quality, Fullscreen and window resolution across launches. Saved in config.json.",
   "dll": "GraphicsSettings.dll",
   "enabled": true
 }
