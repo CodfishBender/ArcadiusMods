@@ -13,10 +13,6 @@ namespace ArcadiusOffline
 	// Replaces Unity Gaming Services with local stand-ins and hosts the game world in-process.
 	public static class OfflineMode
 	{
-		// Same key prefix UnityServicesGateway uses for its local Cloud Save cache, so
-		// progress cached while playing online is picked up offline.
-		private const string LocalCachePrefix = "UGS_LOCAL_DATA_";
-
 		private const string PlayerIdKey = "OFFLINE_PLAYER_ID";
 
 		private const string ClientVersion = "1.0.5";
@@ -53,16 +49,26 @@ namespace ArcadiusOffline
 			return Task.FromException<T>(new OfflineModeException(feature));
 		}
 
+		// Saves are encrypted and authenticated (SecureSave). A tampered save fails the load: the game shows
+		// "Save data failed." and stops there, instead of starting a fresh character over the save.
 		public static Task<Dictionary<string, string>> LoadPlayerData(IEnumerable<string> keys)
 		{
 			Dictionary<string, string> loaded = new Dictionary<string, string>();
-			foreach (string key in keys)
+			try
 			{
-				string prefsKey = LocalCachePrefix + key;
-				if (PlayerPrefs.HasKey(prefsKey))
+				foreach (string key in keys)
 				{
-					loaded[key] = PlayerPrefs.GetString(prefsKey);
+					string value = SecureSave.Get(key);
+					if (value != null)
+					{
+						loaded[key] = value;
+					}
 				}
+			}
+			catch (SaveTamperedException ex)
+			{
+				Debug.LogError("[Offline] " + ex.Message + " Not loading the save.");
+				return Task.FromException<Dictionary<string, string>>(ex);
 			}
 			Debug.Log("[Offline] Loaded " + loaded.Count + " save key(s) from local storage.");
 			return Task.FromResult(loaded);
@@ -72,7 +78,7 @@ namespace ArcadiusOffline
 		{
 			foreach (KeyValuePair<string, string> entry in data)
 			{
-				PlayerPrefs.SetString(LocalCachePrefix + entry.Key, entry.Value);
+				SecureSave.Set(entry.Key, entry.Value);
 			}
 			PlayerPrefs.Save();
 			Debug.Log("[Offline] Saved " + data.Count + " save key(s) to local storage.");

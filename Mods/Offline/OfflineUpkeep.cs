@@ -13,7 +13,8 @@ namespace ArcadiusOffline
 	// Not captured, so inferred: level-up rules, how long a bonus stays active, failure messages.
 	public static class OfflineUpkeep
 	{
-		private const string StateKey = "OFFLINE_UPKEEP_STATIONS";
+		// SecureSave name: an edited value fails its integrity check and the state starts fresh.
+		private const string StateKey = "UpkeepStations";
 
 		// Weekly cycles: cycle 42 ended 2026-10-29T08:00Z, so cycle 0 began 2026-01-01T08:00Z.
 		private static readonly DateTime CycleEpoch = new DateTime(2026, 1, 1, 8, 0, 0, DateTimeKind.Utc);
@@ -358,12 +359,11 @@ namespace ArcadiusOffline
 				return _cache;
 			}
 			SavedState saved = null;
-			string json = PlayerPrefs.GetString(StateKey, string.Empty);
-			if (!string.IsNullOrEmpty(json))
+			if (SecureSave.Has(StateKey))
 			{
 				try
 				{
-					saved = Newtonsoft.Json.JsonConvert.DeserializeObject<SavedState>(json);
+					saved = Newtonsoft.Json.JsonConvert.DeserializeObject<SavedState>(SecureSave.Get(StateKey));
 				}
 				catch (Exception ex)
 				{
@@ -384,7 +384,7 @@ namespace ArcadiusOffline
 
 		private static void Save(SavedState saved)
 		{
-			PlayerPrefs.SetString(StateKey, Newtonsoft.Json.JsonConvert.SerializeObject(saved));
+			SecureSave.Set(StateKey, Newtonsoft.Json.JsonConvert.SerializeObject(saved));
 			PlayerPrefs.Save();
 		}
 

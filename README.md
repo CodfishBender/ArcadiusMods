@@ -192,7 +192,7 @@ so far is dumped, so visit more screens and dump again.
 
 | Mod | Default | What it does |
 |---|---|---|
-| `Offline` | on | Play without Unity Gaming Services. Chat has no mining level 5 requirement and goes through the game server (local or private) instead of Vivox. Settings: `upkeepRequirementPercent` (10), `townBonuses` (true). |
+| `Offline` | on | Play without Unity Gaming Services. Chat has no mining level 5 requirement and goes through the game server (local or private) instead of Vivox. The save is obfuscated so it can't easily be edited by hand (encrypted and signed with a fixed key in the mod, so not secure, but it can be copied to another computer); an edited save fails to load ("Save data failed."). Settings: `upkeepRequirementPercent` (10), `townBonuses` (true). |
 | `Tweaks` | on | Example: `sellValuePercent` and `xpPercent` (100 = unchanged). Needs `offline`. |
 | `PerfectHits` | on | Mining and woodcutting swings at or above `perfectHitPercent` (95) count as a 100% double-damage hit. Needs `offline`. |
 | `TreeLogs` | on | Felled trees always drop `logsPerTree` logs (3) instead of 1 to 3. Needs `offline`. |

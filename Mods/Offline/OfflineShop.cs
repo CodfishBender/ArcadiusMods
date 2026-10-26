@@ -10,7 +10,8 @@ namespace ArcadiusOffline
 	// were not captured; their messages are our own. Platnum packages (real-money items) are refused.
 	public static class OfflineShop
 	{
-		private const string OwnedKey = "OFFLINE_OWNED_COSMETICS";
+		// SecureSave name: an edited value fails its integrity check and the state starts fresh.
+		private const string OwnedKey = "OwnedCosmetics";
 
 		private const string CatalogVersion = "live-1";
 
@@ -67,7 +68,7 @@ namespace ArcadiusOffline
 
 			SavedOwnership saved = Load();
 			saved.purchasedCosmeticIds.Add(item.cosmeticId);
-			PlayerPrefs.SetString(OwnedKey, Newtonsoft.Json.JsonConvert.SerializeObject(saved));
+			SecureSave.Set(OwnedKey, Newtonsoft.Json.JsonConvert.SerializeObject(saved));
 			PlayerPrefs.Save();
 
 			// Spend before saving the character, so the new balance is what gets saved.
@@ -123,12 +124,11 @@ namespace ArcadiusOffline
 		private static SavedOwnership Load()
 		{
 			SavedOwnership saved = null;
-			string json = PlayerPrefs.GetString(OwnedKey, string.Empty);
-			if (!string.IsNullOrEmpty(json))
+			if (SecureSave.Has(OwnedKey))
 			{
 				try
 				{
-					saved = Newtonsoft.Json.JsonConvert.DeserializeObject<SavedOwnership>(json);
+					saved = Newtonsoft.Json.JsonConvert.DeserializeObject<SavedOwnership>(SecureSave.Get(OwnedKey));
 				}
 				catch (Exception ex)
 				{

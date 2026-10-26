@@ -12,7 +12,8 @@ namespace ArcadiusOffline
 	// Failure cases were not captured; their messages are our own.
 	public static class OfflineContracts
 	{
-		private const string StateKey = "OFFLINE_MINING_CONTRACTS";
+		// SecureSave name: an edited value fails its integrity check and the state starts fresh.
+		private const string StateKey = "MiningContracts";
 
 		// Board resets daily at 08:00 UTC (captured resetAt was 2026-10-25T08:00:00Z).
 		private const int ResetHourUtc = 8;
@@ -148,12 +149,11 @@ namespace ArcadiusOffline
 		private static SavedState Load()
 		{
 			SavedState saved = null;
-			string json = PlayerPrefs.GetString(StateKey, string.Empty);
-			if (!string.IsNullOrEmpty(json))
+			if (SecureSave.Has(StateKey))
 			{
 				try
 				{
-					saved = Newtonsoft.Json.JsonConvert.DeserializeObject<SavedState>(json);
+					saved = Newtonsoft.Json.JsonConvert.DeserializeObject<SavedState>(SecureSave.Get(StateKey));
 				}
 				catch (Exception ex)
 				{
@@ -180,7 +180,7 @@ namespace ArcadiusOffline
 
 		private static void Save(SavedState saved)
 		{
-			PlayerPrefs.SetString(StateKey, Newtonsoft.Json.JsonConvert.SerializeObject(saved));
+			SecureSave.Set(StateKey, Newtonsoft.Json.JsonConvert.SerializeObject(saved));
 			PlayerPrefs.Save();
 		}
 
