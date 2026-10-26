@@ -2,7 +2,7 @@
   "id": "unofficialfixes",
   "name": "Unofficial Fixes",
   "version": "1.0.0",
-  "description": "Small fixes for game bugs, each with its own switch in config.json: the Quality setting is remembered, fullscreen or windowed mode and the window size are remembered, and F11 switches fullscreen in one press.",
+  "description": "Small fixes for game bugs, each with its own switch in config.json: the Quality setting is remembered, fullscreen or windowed mode and the window size are remembered, F11 switches fullscreen in one press, the hotbar doesn't change while Settings is open, and holding jump keeps jumping.",
   "dll": "UnofficialFixes.dll",
   "enabled": true
 }

@@ -16,6 +16,10 @@ namespace ArcadiusUnofficialFixes
 
 		internal static bool FixF11Fullscreen;
 
+		internal static bool NoHotbarScrollInSettings;
+
+		internal static bool HoldToJump;
+
 		public void OnLoad(ModContext context)
 		{
 			Context = context;
@@ -25,6 +29,8 @@ namespace ArcadiusUnofficialFixes
 			QualityFix.Patch(harmony);
 			DisplayModeFix.Patch(harmony);
 			F11Fix.Patch(harmony);
+			HotbarFix.Patch(harmony);
+			JumpFix.Patch(harmony);
 		}
 
 		private static void ReadSettings()
@@ -33,6 +39,8 @@ namespace ArcadiusUnofficialFixes
 			RememberQuality = config.Get("rememberQuality", true);
 			RememberDisplayMode = config.Get("rememberDisplayMode", true);
 			FixF11Fullscreen = config.Get("fixF11Fullscreen", true);
+			NoHotbarScrollInSettings = config.Get("noHotbarScrollInSettings", true);
+			HoldToJump = config.Get("holdToJump", true);
 		}
 	}
 }
