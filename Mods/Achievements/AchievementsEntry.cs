@@ -61,6 +61,8 @@ namespace ArcadiusAchievements
 		{
 			_showPopups = _config.Get("showPopups", true);
 			Popup.Seconds = Mathf.Clamp(_config.Get("popupSeconds", 5f), 1f, 60f);
+			Chime.Enabled = _config.Get("chime", true);
+			Chime.Volume = Mathf.Clamp01(_config.Get("chimeVolume", 0.7f));
 		}
 
 		private static void Update()

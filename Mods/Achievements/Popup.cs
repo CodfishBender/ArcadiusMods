@@ -51,6 +51,7 @@ namespace ArcadiusAchievements
 				_text.text = text;
 				_box.gameObject.SetActive(true);
 				_shownAt = Time.unscaledTime;
+				Chime.Play(_box.parent.gameObject);
 			}
 			float age = Time.unscaledTime - _shownAt;
 			float visible = Mathf.Clamp01(Mathf.Min(age, Seconds - age) / Fade);
