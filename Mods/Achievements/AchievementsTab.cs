@@ -297,11 +297,15 @@ namespace ArcadiusAchievements
 			layout.childForceExpandWidth = true;
 			layout.childForceExpandHeight = false;
 			layout.spacing = 5f;
+			// Clear of the page border at the bottom: buttons shrink (to their minHeight) rather than run over.
+			layout.padding = new RectOffset(0, 0, 0, 10);
 
 			Heading(rect, style, "Show");
 			GameObject statusRow = new GameObject("Show", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
 			statusRow.transform.SetParent(rect, false);
-			statusRow.GetComponent<LayoutElement>().preferredHeight = 34f;
+			LayoutElement statusElement = statusRow.GetComponent<LayoutElement>();
+			statusElement.preferredHeight = 34f;
+			statusElement.minHeight = 26f;
 			HorizontalLayoutGroup row = statusRow.GetComponent<HorizontalLayoutGroup>();
 			row.childControlWidth = true;
 			row.childControlHeight = true;
@@ -329,7 +333,9 @@ namespace ArcadiusAchievements
 		{
 			GameObject go = new GameObject(text + " heading", typeof(RectTransform), typeof(LayoutElement));
 			go.transform.SetParent(parent, false);
-			go.GetComponent<LayoutElement>().preferredHeight = 22f;
+			LayoutElement element = go.GetComponent<LayoutElement>();
+			element.preferredHeight = 22f;
+			element.minHeight = 18f;
 			TextMeshProUGUI label = go.AddComponent<TextMeshProUGUI>();
 			label.font = style.font;
 			label.fontSize = 18f;
@@ -594,6 +600,7 @@ namespace ArcadiusAchievements
 				go.transform.SetParent(parent, false);
 				LayoutElement element = go.GetComponent<LayoutElement>();
 				element.preferredHeight = height;
+				element.minHeight = height * 0.75f;
 				element.flexibleWidth = 1f;
 				_background = go.GetComponent<Image>();
 				Button button = go.GetComponent<Button>();
