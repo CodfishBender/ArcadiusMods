@@ -1,5 +1,6 @@
 using ArcadiusModLoader;
 using HarmonyLib;
+using UnityEngine;
 
 namespace ArcadiusUnofficialFixes
 {
@@ -20,6 +21,12 @@ namespace ArcadiusUnofficialFixes
 
 		internal static bool HoldToJump;
 
+		internal static bool LogFriction;
+
+		internal static float LogDrag;
+
+		internal static float LogRollingDrag;
+
 		public void OnLoad(ModContext context)
 		{
 			Context = context;
@@ -31,6 +38,7 @@ namespace ArcadiusUnofficialFixes
 			F11Fix.Patch(harmony);
 			HotbarFix.Patch(harmony);
 			JumpFix.Patch(harmony);
+			LogFrictionFix.Patch(harmony);
 		}
 
 		private static void ReadSettings()
@@ -41,6 +49,9 @@ namespace ArcadiusUnofficialFixes
 			FixF11Fullscreen = config.Get("fixF11Fullscreen", true);
 			NoHotbarScrollInSettings = config.Get("noHotbarScrollInSettings", true);
 			HoldToJump = config.Get("holdToJump", true);
+			LogFriction = config.Get("logFriction", true);
+			LogDrag = Mathf.Clamp(config.Get("logDrag", 0.5f), 0f, 20f);
+			LogRollingDrag = Mathf.Clamp(config.Get("logRollingDrag", 3f), 0f, 50f);
 		}
 	}
 }
