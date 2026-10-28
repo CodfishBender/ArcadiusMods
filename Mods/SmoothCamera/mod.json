@@ -1,0 +1,8 @@
+{
+  "id": "smoothcamera",
+  "name": "Smooth Camera",
+  "version": "1.0.0",
+  "description": "Slightly smoother third-person camera: the player and camera move smoothly between physics steps (no stutter above 50 FPS), with light smoothing on looking around, on steps and landings, and when the camera moves back out after a wall. Settings: interpolation (true), rotationSmoothing (0.03 s), heightSmoothing (0.06 s), zoomOutSmoothing (0.3 s); 0 turns one off.",
+  "dll": "SmoothCamera.dll",
+  "enabled": true
+}
